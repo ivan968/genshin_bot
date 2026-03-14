@@ -1,0 +1,1080 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Genshin Stats</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="bg-base"></div>
+  <div class="bg-pattern"></div>
+  <div class="bg-glows"></div>
+
+  <div class="app">
+    <header>
+      <div class="logo">
+        <img src="icons/paimon.webp" class="logo-inner" alt="Paimon"
+          onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'logo-inner',textContent:'✦'}))" />
+      </div>
+      <div class="header-text">
+        <h1>Genshin Stats</h1>
+        <p>Пошук по UID · Enka.Network</p>
+      </div>
+    </header>
+
+    <div class="content">
+      <!-- UID Input -->
+      <div class="uid-section">
+        <label>Введи свій UID</label>
+        <div class="uid-row">
+          <input
+            class="uid-input"
+            id="uidInput"
+            type="text"
+            inputmode="numeric"
+            pattern="[0-9]*"
+            placeholder="Наприклад: 825436941"
+            maxlength="10"
+          />
+          <button class="btn-search" id="searchBtn" onclick="fetchPlayer()">Шукати</button>
+        </div>
+        <p class="uid-hint">
+          UID знаходиться <b>знизу праворуч</b> екрана в грі.<br>
+          Персонажі мають бути у <b>вітрині (showcase)</b>.
+        </p>
+      </div>
+
+      <!-- Loading -->
+      <div class="state-box" id="loadingBox">
+        <div class="spinner-wrap">
+          <div class="spinner-ring"></div>
+          <div class="spinner-dot"></div>
+        </div>
+        <div class="state-title">Завантаження...</div>
+        <div class="state-msg" id="loadingMsg">Отримуємо дані з Enka.Network</div>
+      </div>
+
+      <!-- Error -->
+      <div class="state-box" id="errorBox">
+        <div class="state-icon">⚠️</div>
+        <div class="state-title">Помилка</div>
+        <div class="state-msg" id="errorMsg">Щось пішло не так</div>
+        <button class="btn-retry" onclick="fetchPlayer()" style="margin-top:18px;">↺ Спробувати ще раз</button>
+      </div>
+
+      <!-- Player Card -->
+      <div class="player-card" id="playerCard">
+        <!-- Banner with avatar + info -->
+        <div class="player-banner">
+          <div class="player-header">
+            <div class="player-avatar" id="playerAvatar">🌸</div>
+            <div class="player-info">
+              <div class="player-name" id="playerName">—</div>
+              <div class="player-uid" id="playerUidText">UID: —</div>
+              <div class="player-sig" id="playerSig"></div>
+            </div>
+          </div>
+        </div>
+        <!-- Stats -->
+        <div class="player-stats">
+          <div class="stats-grid">
+            <div class="stat-item">
+              <img src="icons/stat_ar.png" class="stat-icon" alt="" onerror="this.outerHTML='⚔'">
+              <div class="stat-text">
+                <span class="stat-val" id="statAdv">—</span>
+                <div class="stat-lbl">Рівень AR</div>
+              </div>
+            </div>
+            <div class="stat-item">
+              <img src="icons/stat_world.png" class="stat-icon" alt="" onerror="this.outerHTML='🌍'">
+              <div class="stat-text">
+                <span class="stat-val" id="statWorld">—</span>
+                <div class="stat-lbl">Світ</div>
+              </div>
+            </div>
+            <div class="stat-item">
+              <img src="icons/stat_achiev.png" class="stat-icon" alt="" onerror="this.outerHTML='🏆'">
+              <div class="stat-text">
+                <span class="stat-val" id="statAchiev">—</span>
+                <div class="stat-lbl">Досягн.</div>
+              </div>
+            </div>
+            <div class="stat-item">
+              <img src="icons/stat_abyss.png" class="stat-icon" alt="" onerror="this.outerHTML='🌀'">
+              <div class="stat-text">
+                <span class="stat-val" id="statAbyss">—</span>
+                <div class="stat-lbl">Безодня</div>
+              </div>
+            </div>
+            <div class="stat-item">
+              <img src="icons/stat_theater.png" class="stat-icon" alt="" onerror="this.outerHTML='🎭'">
+              <div class="stat-text">
+                <span class="stat-val" id="statTheater">—</span>
+                <div class="stat-lbl">Театр</div>
+              </div>
+            </div>
+            <div class="stat-item">
+              <img src="icons/stat_chars.png" class="stat-icon" alt="" onerror="this.outerHTML='👥'">
+              <div class="stat-text">
+                <span class="stat-val" id="statChars">—</span>
+                <div class="stat-lbl">Вітрина</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Wish note -->
+      <div class="wish-note" id="wishNote">
+        <div class="wish-note-title">💫 Статистика круток</div>
+        <p>
+          Для перегляду детальної статистики круток (pity, кількість pulls, розподіл 5★) використовуй
+          <a href="https://paimon.moe/wish" target="_blank">paimon.moe/wish</a> — найкращий трекер.
+          Ці дані не доступні публічно через API.
+        </p>
+      </div>
+
+      <!-- Characters -->
+      <div id="charsSection" style="display:none">
+        <div class="section-title"><span class="section-title-icon">✦</span> Вітрина персонажів</div>
+        <div class="chars-list" id="charsList"></div>
+      </div>
+
+      <div class="no-chars" id="noChars">
+        <p>🎭 Вітрина порожня або закрита.<br>Додай персонажів у вітрину в меню гри.</p>
+      </div>
+
+      <div class="bottom-pad"></div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    // Init Telegram WebApp
+    const tg = window.Telegram?.WebApp;
+    if (tg) {
+      tg.ready();
+      tg.expand();
+      tg.setHeaderColor('#0d0e12');
+      tg.setBackgroundColor('#0d0e12');
+    }
+
+    // ── DATA MAPS ──
+
+    // ── ICONS CONFIG ──
+    // All local icon paths. If file missing → falls back to emoji automatically.
+    // Put your PNG files in the icons/ folder next to index.html.
+    const ICONS = {
+      // ── Logo ──
+      logo:           'icons/logo.png',
+
+      // ── Elements (16×16 or 24×24 PNG) ──
+      el_pyro:        'icons/el_pyro.png',
+      el_hydro:       'icons/el_hydro.png',
+      el_anemo:       'icons/el_anemo.png',
+      el_electro:     'icons/el_electro.png',
+      el_dendro:      'icons/el_dendro.png',
+      el_cryo:        'icons/el_cryo.png',
+      el_geo:         'icons/el_geo.png',
+
+      // ── Artifact slot placeholders (shown when slot is empty) ──
+      art_flower:     'icons/art_flower.png',
+      art_plume:      'icons/art_plume.png',
+      art_sands:      'icons/art_sands.png',
+      art_goblet:     'icons/art_goblet.png',
+      art_circlet:    'icons/art_circlet.png',
+
+      // ── Player stats header ──
+      stat_ar:        'icons/stat_ar.png',
+      stat_world:     'icons/stat_world.png',
+      stat_achiev:    'icons/stat_achiev.png',
+      stat_abyss:     'icons/stat_abyss.png',
+      stat_theater:   'icons/stat_theater.png',
+      stat_chars:     'icons/stat_chars.png',
+    };
+
+    // Helper: returns <img> html with emoji fallback
+    // size — css size string e.g. '16px'
+    function iconImg(src, fallbackEmoji, size = '16px', cls = '') {
+      return `<img src="${src}" class="custom-icon${cls ? ' ' + cls : ''}"
+        style="width:${size};height:${size};object-fit:contain;vertical-align:middle;"
+        alt="" onerror="this.outerHTML='${fallbackEmoji}'" />`;
+    }
+
+    const ELEMENT_MAP = {
+      Fire:     { name: 'Pyro',    icon: ICONS.el_pyro,     emoji: '🔥', cls: 'el-pyro' },
+      Water:    { name: 'Hydro',   icon: ICONS.el_hydro,    emoji: '💧', cls: 'el-hydro' },
+      Wind:     { name: 'Anemo',   icon: ICONS.el_anemo,    emoji: '🍃', cls: 'el-anemo' },
+      Electric: { name: 'Electro', icon: ICONS.el_electro,  emoji: '⚡', cls: 'el-electro' },
+      Grass:    { name: 'Dendro',  icon: ICONS.el_dendro,   emoji: '🌿', cls: 'el-dendro' },
+      Ice:      { name: 'Cryo',    icon: ICONS.el_cryo,     emoji: '❄️', cls: 'el-cryo' },
+      Rock:     { name: 'Geo',     icon: ICONS.el_geo,      emoji: '🪨', cls: 'el-geo' },
+    };
+
+    const ARTIFACT_SLOT  = ['Flower', 'Plume', 'Sands', 'Goblet', 'Circlet'];
+    const ARTIFACT_EMOJI = ['🌸', '🪶', '⏳', '🏺', '👑'];   // fallback if PNG missing
+    const ARTIFACT_ICON  = [                                   // local PNG paths
+      ICONS.art_flower, ICONS.art_plume, ICONS.art_sands,
+      ICONS.art_goblet, ICONS.art_circlet,
+    ];
+    const EQUIP_TYPE_MAP = {
+      EQUIP_BRACER: 0, EQUIP_NECKLACE: 1,
+      EQUIP_SHOES: 2, EQUIP_RING: 3, EQUIP_DRESS: 4,
+    };
+
+    const FIGHT_PROP = {
+      '2000': ['HP', '♥'],
+      '2001': ['ATK', '⚔'],
+      '2002': ['DEF', '🛡'],
+      '20':   ['CRIT Rate', '🎯', '%'],
+      '22':   ['CRIT DMG', '💥', '%'],
+      '28':   ['Elemental Mastery', '✨'],
+      '23':   ['Energy Recharge', '⚡', '%'],
+    };
+
+    // ── PROXY CONFIG ──
+    const ENKA_BASE = 'https://enka.network';
+    const ICON_BASE = 'https://enka.network/ui/';
+
+    // ══════════════════════════════════════════════════════
+    // YOUR CLOUDFLARE WORKER URL — paste here after deploy:
+    // See worker.js file for setup instructions (2 minutes)
+    // ══════════════════════════════════════════════════════
+    const WORKER_URL = 'https://nameless-silence-765f.ivanpolishchuk45.workers.dev';  // e.g. 'https://enka-proxy.yourname.workers.dev'
+
+    // Build proxy list dynamically — worker goes first if configured
+    function buildProxyList() {
+      const list = [];
+
+      // Worker (most reliable — your own Cloudflare Worker, no CORS issues)
+      if (WORKER_URL) {
+        list.push({
+          name: 'Worker',
+          build: url => {
+            const path = url.replace(ENKA_BASE, '');
+            return WORKER_URL + path;
+          },
+          unwrap: t => t,
+        });
+      }
+
+      // Direct to Enka — works when Telegram WebApp sends a real origin
+      // (not file://)
+      list.push({
+        name: 'Enka direct',
+        build: url => url,
+        unwrap: t => t,
+        skipOnNullOrigin: true,
+      });
+
+      // allorigins /get — wraps in {contents, status.http_code}
+      // Works from any origin including null. Most reliable free proxy.
+      list.push({
+        name: 'AllOrigins',
+        build: url => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
+        unwrap: text => {
+          const j = JSON.parse(text);
+          if (j?.status?.http_code && j.status.http_code !== 200) {
+            const e = new Error('upstream_error');
+            e.httpCode = j.status.http_code;
+            throw e;
+          }
+          return j.contents;
+        },
+      });
+
+      // corsproxy.io — works from https:// origins (Telegram WebApp)
+      list.push({
+        name: 'corsproxy.io',
+        build: url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+        unwrap: t => t,
+        skipOnNullOrigin: true,
+      });
+
+      // cors-anywhere on Heroku — open, accepts all origins
+      list.push({
+        name: 'cors-anywhere',
+        build: url => `https://cors-anywhere.herokuapp.com/${url}`,
+        unwrap: t => t,
+      });
+
+      return list;
+    }
+
+    const PROXIES = buildProxyList();
+
+    let characterData = {};
+    let weaponData = {};
+
+    // Detect null origin (file://) — some proxies block it
+    const IS_NULL_ORIGIN = location.protocol === 'file:' || location.origin === 'null';
+
+    // ── ROBUST FETCH with retry across proxies ──
+    async function fetchWithRetry(targetUrl, externalSignal) {
+      let lastError;
+      let proxyIndex = 0;
+
+      const codeMap = {
+        400: 'Неправильний UID',
+        404: 'Гравець не знайдений або профіль закритий',
+        429: 'Забагато запитів — зачекай ~15 секунд і спробуй ще раз',
+        424: 'Сервер Genshin тимчасово недоступний, спробуй пізніше',
+      };
+
+      for (const proxy of PROXIES) {
+        // If cancelled externally — stop immediately
+        if (externalSignal?.aborted) break;
+
+        // Skip direct fetch when running from file:// — will always be CORS-blocked
+        if (proxy.skipOnNullOrigin && IS_NULL_ORIGIN) continue;
+
+        const idx = proxyIndex++;
+        const msgEl = document.getElementById('loadingMsg');
+        if (msgEl) {
+          msgEl.textContent = idx === 0
+            ? 'Отримуємо дані з Enka.Network…'
+            : `Резервний канал ${idx} (${proxy.name})…`;
+        }
+
+        for (let attempt = 0; attempt < 2; attempt++) {
+          if (externalSignal?.aborted) break;
+
+          try {
+            // Combine our timeout controller with the external cancel signal
+            const timeoutCtrl = new AbortController();
+            const tid = setTimeout(() => timeoutCtrl.abort(), 14000);
+
+            // Link external cancel to our timeout controller
+            externalSignal?.addEventListener('abort', () => timeoutCtrl.abort(), { once: true });
+
+            const resp = await fetch(proxy.build(targetUrl), {
+              signal: timeoutCtrl.signal,
+              cache: 'no-store',
+              headers: proxy.directOnly ? {} : { 'X-Requested-With': 'XMLHttpRequest' },
+            });
+            clearTimeout(tid);
+
+            // Proxies that pass-through Enka's HTTP status directly
+            if (codeMap[resp.status]) {
+              return { ok: false, status: resp.status, msg: codeMap[resp.status] };
+            }
+
+            if (resp.status !== 200) {
+              lastError = new Error(`${proxy.name}: HTTP ${resp.status}`);
+              if (resp.status >= 500 && attempt === 0) { await sleep(800); continue; }
+              break;
+            }
+
+            let raw;
+            try { raw = await resp.text(); } catch (e) {
+              lastError = new Error(`${proxy.name}: не вдалося прочитати відповідь`);
+              break;
+            }
+
+            if (!raw || raw.length < 10) {
+              lastError = new Error(`${proxy.name}: порожня відповідь`);
+              break;
+            }
+
+            if (raw.trimStart().startsWith('<!') || raw.trimStart().startsWith('<html')) {
+              lastError = new Error(`${proxy.name}: повернув HTML сторінку`);
+              break;
+            }
+
+            let bodyText;
+            try {
+              bodyText = proxy.unwrap(raw);
+            } catch (e) {
+              if (e.httpCode && codeMap[e.httpCode]) {
+                return { ok: false, status: e.httpCode, msg: codeMap[e.httpCode] };
+              }
+              lastError = new Error(`${proxy.name}: unwrap failed — ${e.message}`);
+              break;
+            }
+
+            if (!bodyText || bodyText.trim() === '') {
+              lastError = new Error(`${proxy.name}: пусте тіло після unwrap`);
+              break;
+            }
+
+            let json;
+            try { json = JSON.parse(bodyText); } catch {
+              lastError = new Error(`${proxy.name}: невалідний JSON`);
+              break;
+            }
+
+            if (json?.retcode && json.retcode !== 0) {
+              const msg = codeMap[json.retcode] || `Помилка Enka (${json.retcode})`;
+              return { ok: false, status: json.retcode, msg };
+            }
+
+            if (!json?.playerInfo) {
+              lastError = new Error(`${proxy.name}: відповідь без playerInfo`);
+              break;
+            }
+
+            return { ok: true, data: json };
+
+          } catch (e) {
+            // Abort from external signal — propagate up
+            if (externalSignal?.aborted) {
+              return { ok: false, msg: 'cancelled' };
+            }
+            if (e.name === 'AbortError') {
+              lastError = new Error(`${proxy.name}: timeout`);
+            } else {
+              lastError = e;
+            }
+            if (attempt === 0) await sleep(500);
+          }
+        }
+      }
+
+      if (externalSignal?.aborted) {
+        return { ok: false, msg: 'cancelled' };
+      }
+
+      const workerHint = WORKER_URL ? '' : '\n\nДля стабільної роботи налаштуй Cloudflare Worker (інструкція у файлі worker.js).';
+      return {
+        ok: false,
+        msg: `Не вдалося підключитись до Enka.Network. Перевір інтернет або спробуй пізніше.${workerHint}\n\n(${lastError?.message || 'невідома помилка'})`,
+      };
+    }
+
+    function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+    // Global abort controller — cancelled when a new search starts
+    let _searchAbortController = null;
+
+    // ── REQUEST CANCELLATION ──
+    let _currentSearchToken = 0;
+
+    // ── MAIN FETCH ──
+    async function fetchPlayer() {
+      const uid = document.getElementById('uidInput').value.trim().replace(/\D/g, '');
+      if (!uid || uid.length !== 9) {
+        showToast('UID має бути рівно 9 цифр');
+        return;
+      }
+
+      // Cancel any in-flight network request from the previous search
+      if (_searchAbortController) {
+        _searchAbortController.abort();
+      }
+      _searchAbortController = new AbortController();
+      const myAbortSignal = _searchAbortController.signal;
+
+      // Bump token — stale results from the previous search will be discarded
+      const myToken = ++_currentSearchToken;
+
+      setState('loading');
+      const btn = document.getElementById('searchBtn');
+      btn.disabled = true;
+
+      let result;
+      try {
+        result = await fetchWithRetry(`${ENKA_BASE}/api/uid/${uid}/`, myAbortSignal);
+      } catch (e) {
+        result = { ok: false, msg: e.message || 'Не вдалося завантажити дані' };
+      }
+
+      // A newer search started while we were waiting — silently discard
+      if (myToken !== _currentSearchToken) return;
+
+      btn.disabled = false;
+
+      if (!result.ok) {
+        // Ignore abort errors caused by the user starting a new search
+        if (result.msg?.includes('abort') || result.msg?.includes('cancel')) return;
+        setState('error', result.msg || 'Не вдалося завантажити дані');
+        return;
+      }
+
+      renderPlayer(result.data, uid);
+    }
+
+    // ── RENDER PLAYER ──
+    function renderPlayer(data, uid) {
+      const pi = data.playerInfo;
+
+      // ── Avatar ──
+      // Enka profilePicture now uses { id: N } (newer API).
+      // resolvePfpById fetches Enka's pfps map to get the correct icon name.
+      const avatarEl = document.getElementById('playerAvatar');
+      const pp = pi.profilePicture || {};
+
+      const avatarCandidates = [];
+      if (pp.avatarId) {
+        const iconUrl = getCharIcon(pp.avatarId);
+        if (iconUrl) avatarCandidates.push(iconUrl);
+      }
+      if (pp.costumeId) avatarCandidates.push(`${ICON_BASE}UI_AvatarIcon_${pp.costumeId}_Circle.png`);
+      if (pp.pictureId) avatarCandidates.push(`${ICON_BASE}UI_NameCardPic_${pp.pictureId}_P.png`);
+
+      if (pp.id) {
+        resolvePfpById(pp.id, avatarEl, avatarCandidates);
+      } else if (avatarCandidates.length > 0) {
+        loadFirstWorking(avatarEl, avatarCandidates);
+      } else {
+        avatarEl.textContent = '🌸';
+      }
+
+      document.getElementById('playerName').textContent = pi.nickname || 'Невідомо';
+      document.getElementById('playerUidText').textContent = `UID: ${uid}`;
+      document.getElementById('playerSig').textContent = pi.signature || '';
+
+      document.getElementById('statAdv').textContent = pi.level || '—';
+      document.getElementById('statWorld').textContent = pi.worldLevel ?? '—';
+      document.getElementById('statAchiev').textContent = pi.finishAchievementNum ?? '—';
+
+      const abyss = pi.towerFloorIndex
+        ? `${pi.towerFloorIndex}-${pi.towerLevelIndex}`
+        : '—';
+      document.getElementById('statAbyss').textContent = abyss;
+
+      const theater = pi.theaterStars ? `${pi.theaterStars}★` : '—';
+      document.getElementById('statTheater').textContent = theater;
+
+      const chars = data.avatarInfoList || [];
+      document.getElementById('statChars').textContent = chars.length;
+
+      setState('player');
+
+      // Characters
+      if (chars.length > 0) {
+        document.getElementById('charsSection').style.display = 'block';
+        document.getElementById('noChars').classList.remove('visible');
+        renderCharacters(chars, data);
+        document.getElementById('charsList').classList.add('visible');
+      } else {
+        document.getElementById('charsSection').style.display = 'none';
+        document.getElementById('noChars').classList.add('visible');
+      }
+
+      document.getElementById('wishNote').classList.add('visible');
+    }
+
+    // ── RENDER CHARACTERS ──
+    function renderCharacters(chars, data) {
+      const list = document.getElementById('charsList');
+      list.innerHTML = '';
+
+      chars.forEach((char, i) => {
+        const card = buildCharCard(char, i);
+        list.appendChild(card);
+      });
+    }
+
+    function buildCharCard(char, idx) {
+      const charId = char.avatarId;
+      const level = char.propMap?.['4001']?.val || '?';
+      const constell = (char.talentIdList || []).length;
+      const fp = char.fightPropMap || {};
+      const rarity = guessRarity(charId);
+
+      // Get element info
+      const elementInfo = getElementInfo(char);
+
+      const card = document.createElement('div');
+      card.className = `char-card rarity-${rarity}`;
+      card.style.animationDelay = `${idx * 0.06}s`;
+
+      const charName = getCharName(charId);
+      const iconUrl = getCharIcon(charId);
+      const stars = '★'.repeat(rarity);
+      const safeCharName = esc(charName);
+
+      card.innerHTML = `
+        <div class="char-header" onclick="toggleCard(this)">
+          <div class="char-avatar">
+            ${iconUrl
+              ? `<img src="${esc(iconUrl)}" onerror="this.parentNode.textContent='🧍'" alt="${safeCharName}" />`
+              : '<span>🧍</span>'
+            }
+          </div>
+          <div class="char-meta">
+            <div class="char-name">${safeCharName}</div>
+            <div class="char-sub">
+              <span class="rarity-stars">${stars}</span>
+              ${elementInfo
+                ? `<span class="char-element ${esc(elementInfo.cls)}" title="${esc(elementInfo.name)}">
+                    <img src="${elementInfo.icon}"
+                      data-em="${elementInfo.emoji}"
+                      style="width:14px;height:14px;object-fit:contain;vertical-align:middle;"
+                      onerror="this.outerHTML=this.dataset.em" />
+                  </span>`
+                : ''
+              }
+              <span class="char-level">Рівень ${esc(level)}</span>
+              <span class="constellation-badge">C${constell}</span>
+            </div>
+          </div>
+          <span class="expand-arrow">▾</span>
+        </div>
+        <div class="char-details">
+          ${buildWeaponSection(char)}
+          ${buildArtifactsSection(char)}
+          ${buildStatsSection(fp)}
+        </div>
+      `;
+
+      return card;
+    }
+
+    function buildWeaponSection(char) {
+      const equip = char.equipList || [];
+      const weapon = equip.find(e => e.flat?.itemType === 'ITEM_WEAPON');
+      if (!weapon) return '';
+
+      const level = weapon.weapon?.level || 1;
+      const refine = weapon.weapon?.affixMap ? Object.values(weapon.weapon.affixMap)[0] + 1 : 1;
+      const iconKey = weapon.flat?.icon;
+      const iconUrl = iconKey ? `${ICON_BASE}${iconKey}.png` : null;
+      const displayName = getWeaponName(weapon.itemId, iconKey);
+
+      return `
+        <div class="detail-block">
+          <div class="detail-label">⚔ Зброя</div>
+          <div class="weapon-row">
+            <div class="weapon-icon">
+              ${iconUrl
+                ? `<img src="${esc(iconUrl)}" onerror="this.parentNode.textContent='⚔'" alt="weapon" />`
+                : '⚔'
+              }
+            </div>
+            <div>
+              <div class="weapon-name">${esc(displayName)}</div>
+              <div class="weapon-meta">Рівень ${esc(level)} · R${esc(refine)}</div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function buildArtifactsSection(char) {
+      const equip = char.equipList || [];
+      const artifacts = equip.filter(e => e.flat?.itemType === 'ITEM_RELIQUARY');
+
+      if (artifacts.length === 0) return '';
+
+      const slots = [null, null, null, null, null];
+      artifacts.forEach(a => {
+        const idx = EQUIP_TYPE_MAP[a.flat?.equipType];
+        if (idx !== undefined) slots[idx] = a;
+      });
+
+      const slotsHtml = slots.map((art, i) => {
+        const slotName = ARTIFACT_SLOT[i];
+        const fallbackEmoji = ARTIFACT_EMOJI[i];
+        const localIcon = ARTIFACT_ICON[i];
+
+        // Build icon html safely — no nested quotes
+        function makeIconImg(src, w) {
+          // Uses a data attribute trick: onerror reads data-fb for fallback src,
+          // then data-em for emoji text — no nested quotes needed
+          return `<img src="${src}"
+            data-fb="${localIcon}" data-em="${fallbackEmoji}"
+            style="width:${w}px;height:${w}px;object-fit:contain;"
+            onerror="
+              if(this.dataset.step==='2'){this.outerHTML=this.dataset.em;return;}
+              if(this.src!==this.dataset.fb){this.dataset.step='2';this.src=this.dataset.fb;}
+              else{this.outerHTML=this.dataset.em;}
+            " alt="${slotName}" />`;
+        }
+
+        if (!art) {
+          return `<div class="artifact-slot empty">
+            <div class="artifact-icon">
+              <img src="${localIcon}"
+                data-em="${fallbackEmoji}"
+                style="width:28px;height:28px;object-fit:contain;opacity:0.5;"
+                onerror="this.outerHTML=this.dataset.em"
+                alt="${slotName}" />
+            </div>
+            <div class="artifact-name">${slotName}</div>
+          </div>`;
+        }
+
+        const iconKey = art.flat?.icon;
+        const iconUrl = iconKey ? `${ICON_BASE}${iconKey}.png` : null;
+        const mainStat = art.flat?.reliquaryMainstat?.mainPropId || '';
+        const mainStatShort = formatStatName(mainStat);
+
+        return `<div class="artifact-slot" title="${slotName}">
+          <div class="artifact-icon">
+            ${makeIconImg(iconUrl || localIcon, 30)}
+          </div>
+          <div class="artifact-name">${mainStatShort}</div>
+        </div>`;
+      }).join('');
+
+      return `
+        <div class="detail-block">
+          <div class="detail-label">
+            <img src="icons/art_goblet.png" style="width:12px;height:12px;object-fit:contain;vertical-align:middle;" onerror="this.outerHTML='🏺'" />
+            Артефакти
+          </div>
+          <div class="artifacts-grid">${slotsHtml}</div>
+        </div>
+      `;
+    }
+
+    function buildStatsSection(fp) {
+      const showProps = ['2000','2001','2002','20','22','28','23'];
+      const items = showProps.map(id => {
+        const info = FIGHT_PROP[id];
+        if (!info) return '';
+        const raw = fp[id] || 0;
+        const isPercent = info[2] === '%';
+        const val = isPercent
+          ? (raw * 100).toFixed(1) + '%'
+          : Math.round(raw).toLocaleString();
+        return `<div class="prop-item">
+          <span class="prop-name">${info[1]} ${info[0]}</span>
+          <span class="prop-val">${val}</span>
+        </div>`;
+      }).join('');
+
+      return `
+        <div class="detail-block">
+          <div class="detail-label">📊 Статистика</div>
+          <div class="props-grid">${items}</div>
+        </div>
+      `;
+    }
+
+    // ── HELPERS ──
+    function toggleCard(header) {
+      const card = header.closest('.char-card');
+      card.classList.toggle('open');
+    }
+
+    // Try a list of image URLs one by one — show first that loads successfully.
+    function loadFirstWorking(container, urls, fallbackText = '🧑') {
+      const img = document.createElement('img');
+      img.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:inherit;';
+      img.alt = 'avatar';
+
+      let idx = 0;
+      function tryNext() {
+        if (idx >= urls.length) { container.textContent = fallbackText; return; }
+        img.src = urls[idx++];
+      }
+      img.onerror = tryNext;
+      img.onload  = () => { container.innerHTML = ''; container.appendChild(img); };
+      tryNext();
+    }
+
+    // Resolve profilePicture.id → icon URL
+    // pfps.json from Enka API-docs GitHub: { "2100": { "iconPath": "UI_AvatarIcon_..." }, ... }
+    let _pfpsCache = null;
+    async function resolvePfpById(id, container, fallbackCandidates) {
+      // Try to get correct iconPath from Enka's pfps.json
+      try {
+        if (!_pfpsCache) {
+          // Correct source: EnkaNetwork/API-docs store/pfps.json on GitHub
+          const pfpsUrl = 'https://raw.githubusercontent.com/EnkaNetwork/API-docs/master/store/pfps.json';
+          const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(pfpsUrl)}`;
+          const resp = await fetch(proxyUrl, { cache: 'force-cache' });
+          if (resp.ok) {
+            _pfpsCache = await resp.json();
+          }
+        }
+        if (_pfpsCache?.[id]?.iconPath) {
+          const iconPath = _pfpsCache[id].iconPath;
+          // iconPath is like "UI_AvatarIcon_Arlecchino_Circle" — just add .png
+          loadFirstWorking(container, [
+            `${ICON_BASE}${iconPath}.png`,
+            ...fallbackCandidates,
+          ]);
+          return;
+        }
+      } catch (e) {
+        // pfps.json unavailable — fall through to guesses
+      }
+
+      // Fallback: try common URL patterns
+      loadFirstWorking(container, [
+        ...fallbackCandidates,
+        `${ICON_BASE}UI_AvatarIcon_${id}_Circle.png`,
+        `${ICON_BASE}UI_NameCardPic_${id}_P.png`,
+      ]);
+    }
+
+    // Escape HTML to prevent XSS from API data
+    function esc(str) {
+      return String(str ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function getCharIcon(avatarId) {
+      // Map known IDs to enka icon names
+      const knownIcons = {
+        10000002: 'UI_AvatarIcon_Ayaka',
+        10000003: 'UI_AvatarIcon_Qin',
+        10000004: 'UI_AvatarIcon_Barbara',
+        10000005: 'UI_AvatarIcon_Playerboy',
+        10000006: 'UI_AvatarIcon_Lisa',
+        10000007: 'UI_AvatarIcon_Playergirl',
+        10000014: 'UI_AvatarIcon_Venti',
+        10000015: 'UI_AvatarIcon_Kaeya',
+        10000016: 'UI_AvatarIcon_Diluc',
+        10000020: 'UI_AvatarIcon_Razor',
+        10000021: 'UI_AvatarIcon_Ambor',
+        10000022: 'UI_AvatarIcon_Loli',
+        10000023: 'UI_AvatarIcon_Noel',
+        10000024: 'UI_AvatarIcon_Bennett',
+        10000025: 'UI_AvatarIcon_Fischl',
+        10000026: 'UI_AvatarIcon_Guoba',
+        10000027: 'UI_AvatarIcon_Xiangling',
+        10000029: 'UI_AvatarIcon_Beidou',
+        10000030: 'UI_AvatarIcon_Xingqiu',
+        10000031: 'UI_AvatarIcon_Xiao',
+        10000032: 'UI_AvatarIcon_Ningguang',
+        10000033: 'UI_AvatarIcon_Klee',
+        10000034: 'UI_AvatarIcon_Zhongli',
+        10000035: 'UI_AvatarIcon_Sucrose',
+        10000036: 'UI_AvatarIcon_Albedo',
+        10000037: 'UI_AvatarIcon_Diona',
+        10000038: 'UI_AvatarIcon_Mona',
+        10000039: 'UI_AvatarIcon_Keqing',
+        10000041: 'UI_AvatarIcon_Ganyu',
+        10000042: 'UI_AvatarIcon_Hutao',
+        10000043: 'UI_AvatarIcon_Kazuha',
+        10000044: 'UI_AvatarIcon_Feiyan',
+        10000045: 'UI_AvatarIcon_Yoimiya',
+        10000046: 'UI_AvatarIcon_Tohma',
+        10000047: 'UI_AvatarIcon_Xinyan',
+        10000048: 'UI_AvatarIcon_Rosaria',
+        10000049: 'UI_AvatarIcon_Chongyun',
+        10000050: 'UI_AvatarIcon_Gorou',
+        10000051: 'UI_AvatarIcon_Sara',
+        10000052: 'UI_AvatarIcon_Ei',
+        10000053: 'UI_AvatarIcon_Sayu',
+        10000054: 'UI_AvatarIcon_Eula',
+        10000055: 'UI_AvatarIcon_Shougun',
+        10000058: 'UI_AvatarIcon_Aloy',
+        10000059: 'UI_AvatarIcon_Shenhe',
+        10000060: 'UI_AvatarIcon_Yunjin',
+        10000061: 'UI_AvatarIcon_Kokomi',
+        10000062: 'UI_AvatarIcon_Qiqi',
+        10000063: 'UI_AvatarIcon_Heizo',
+        10000064: 'UI_AvatarIcon_Yelan',
+        10000065: 'UI_AvatarIcon_Shinobu',
+        10000066: 'UI_AvatarIcon_Itto',
+        10000067: 'UI_AvatarIcon_Yae',
+        10000069: 'UI_AvatarIcon_Nilou',
+        10000070: 'UI_AvatarIcon_Cyno',
+        10000071: 'UI_AvatarIcon_Candace',
+        10000072: 'UI_AvatarIcon_Nahida',
+        10000073: 'UI_AvatarIcon_Layla',
+        10000074: 'UI_AvatarIcon_Wanderer',
+        10000075: 'UI_AvatarIcon_Faruzan',
+        10000076: 'UI_AvatarIcon_Yaoyao',
+        10000077: 'UI_AvatarIcon_Alhatham',
+        10000078: 'UI_AvatarIcon_Dehya',
+        10000079: 'UI_AvatarIcon_Mika',
+        10000080: 'UI_AvatarIcon_Kaveh',
+        10000081: 'UI_AvatarIcon_Baizhuer',
+        10000082: 'UI_AvatarIcon_Collei',
+        10000083: 'UI_AvatarIcon_Tighnari',
+        10000084: 'UI_AvatarIcon_Dori',
+        10000085: 'UI_AvatarIcon_Freminet',
+        10000086: 'UI_AvatarIcon_Lyney',
+        10000087: 'UI_AvatarIcon_Lynette',
+        10000088: 'UI_AvatarIcon_Furina',
+        10000089: 'UI_AvatarIcon_Charlotte',
+        10000090: 'UI_AvatarIcon_Navia',
+        10000091: 'UI_AvatarIcon_Chevreuse',
+        10000092: 'UI_AvatarIcon_Xianyun',
+        10000093: 'UI_AvatarIcon_Gaming',
+        10000094: 'UI_AvatarIcon_Chiori',
+        10000095: 'UI_AvatarIcon_Sigewinne',
+        10000096: 'UI_AvatarIcon_Arlecchino',
+        10000097: 'UI_AvatarIcon_Sethos',
+        10000098: 'UI_AvatarIcon_Clorinde',
+        10000099: 'UI_AvatarIcon_Emilie',
+        10000100: 'UI_AvatarIcon_Kachina',
+        10000101: 'UI_AvatarIcon_Kinich',
+        10000102: 'UI_AvatarIcon_Mualani',
+        10000103: 'UI_AvatarIcon_Xilonen',
+        10000104: 'UI_AvatarIcon_Chasca',
+        10000105: 'UI_AvatarIcon_Ororon',
+        10000106: 'UI_AvatarIcon_Mavuika',
+        10000107: 'UI_AvatarIcon_Citlali',
+        10000108: 'UI_AvatarIcon_Lan',
+        10000109: 'UI_AvatarIcon_Mizuki',
+        10000110: 'UI_AvatarIcon_Yumemizuki',
+      };
+      const iconName = knownIcons[avatarId];
+      return iconName ? `${ICON_BASE}${iconName}_Circle.png` : null;
+    }
+
+    function getCharName(avatarId) {
+      const names = {
+        10000002: 'Аяка', 10000003: 'Джинн', 10000004: 'Барбара',
+        10000005: 'Гравець (♂)', 10000006: 'Ліза', 10000007: 'Гравець (♀)',
+        10000014: 'Венті', 10000015: 'Кея', 10000016: 'Ділюк',
+        10000020: 'Різо', 10000021: 'Амбер', 10000022: 'Кіра',
+        10000023: 'Ноель', 10000024: 'Беннет', 10000025: 'Фішль',
+        10000026: 'Сяньлін (Пузир)', 10000027: 'Сяньлін', 10000029: 'Бейдоу',
+        10000030: 'Сінцю', 10000031: 'Сяо', 10000032: 'Нінгуан',
+        10000033: 'Клі', 10000034: 'Чжунлі', 10000035: 'Сукроз',
+        10000036: 'Альбедо', 10000037: 'Діона', 10000038: 'Мона',
+        10000039: 'Кецін', 10000041: 'Ганью', 10000042: 'Ху Тао',
+        10000043: 'Казуха', 10000044: 'Фейян', 10000045: 'Йоімія',
+        10000046: 'Тома', 10000047: 'Сіньян', 10000048: 'Розарія',
+        10000049: 'Чунюнь', 10000050: 'Горо', 10000051: 'Сара',
+        10000052: 'Ей (Ямата)', 10000053: 'Саю', 10000054: 'Ейла',
+        10000055: 'Сьоґун Рейдан', 10000058: 'Елой',
+        10000059: 'Шенхе', 10000060: 'Юньцзінь', 10000061: 'Кокомі',
+        10000062: 'Ціці', 10000063: 'Хейдзо', 10000064: 'Єлань',
+        10000065: 'Кукі Сінобу', 10000066: 'Ітто', 10000067: 'Яе Міко',
+        10000069: 'Нілу', 10000070: 'Сіно', 10000071: 'Кандейс',
+        10000072: 'Нахіда', 10000073: 'Лайла', 10000074: 'Странник',
+        10000075: 'Фарузан', 10000076: 'Яояо', 10000077: 'Аль-Хайтам',
+        10000078: 'Дея', 10000079: 'Міка', 10000080: 'Кавех',
+        10000081: 'Байчжу', 10000082: 'Колей', 10000083: 'Тіґнарі',
+        10000084: 'Доррі', 10000085: 'Фремінет', 10000086: 'Ліне',
+        10000087: 'Лінетт', 10000088: 'Фуріна', 10000089: 'Шарлотта',
+        10000090: 'Навія', 10000091: 'Шеврез', 10000092: 'Сяньюнь',
+        10000093: 'Ґеймін', 10000094: 'Чіорі', 10000095: 'Сіґевінне',
+        10000096: 'Арлекіно', 10000097: 'Сетос', 10000098: 'Клорінд',
+        10000099: 'Еміль', 10000100: 'Качіна', 10000101: 'Кінік',
+        10000102: 'Муалані', 10000103: 'Кшілонен', 10000104: 'Часка',
+        10000105: 'Ороро', 10000106: 'Мавуїка', 10000107: 'Сітлалі',
+        10000108: 'Лан', 10000109: 'Мідзукі', 10000110: 'Юмемідзукі',
+      };
+      return names[avatarId] || `Персонаж #${avatarId}`;
+    }
+
+    function getWeaponName(itemId, iconKey) {
+      if (!iconKey) return `Зброя #${itemId}`;
+      // Extract from icon key e.g. UI_EquipIcon_Sword_Aquila → Aquila
+      const parts = iconKey.split('_');
+      return parts.slice(3).join(' ') || iconKey;
+    }
+
+    function getElementInfo(char) {
+      // First try fightPropMap prop '50' (element DMG bonus key indicates element)
+      const eprop = char.fightPropMap?.['50'];
+      const elementByProp = {
+        1: 'Fire', 2: 'Water', 3: 'Grass', 4: 'Electric',
+        5: 'Ice', 6: 'Wind', 7: 'Rock',
+      };
+      const elemKeyFromProp = eprop ? elementByProp[Math.round(eprop)] : null;
+      if (elemKeyFromProp) return ELEMENT_MAP[elemKeyFromProp] || null;
+
+      // Fallback: derive element from skillDepotId (reliable mapping)
+      const depotId = char.skillDepotId;
+      const depotToElement = {
+        201: 'Wind', 202: 'Wind',           // Aether / Lumine (Anemo)
+        204: 'Electric', 205: 'Electric',   // Traveler Electro
+        206: 'Grass', 207: 'Grass',         // Traveler Dendro
+        208: 'Water', 209: 'Water',         // Traveler Hydro
+        210: 'Fire', 211: 'Fire',           // Traveler Pyro
+        504: 'Wind', 506: 'Wind',
+        704: 'Rock', 706: 'Rock',
+        904: 'Electric', 906: 'Electric',
+        1104: 'Grass', 1106: 'Grass',
+        1304: 'Water', 1306: 'Water',
+        1404: 'Ice', 1406: 'Ice',
+        1504: 'Fire', 1506: 'Fire',
+      };
+      const elemKeyFromDepot = depotToElement[depotId];
+      return elemKeyFromDepot ? (ELEMENT_MAP[elemKeyFromDepot] || null) : null;
+    }
+
+    function guessRarity(avatarId) {
+      const fiveStars = [
+        10000002,10000003,10000014,10000016,10000031,10000033,10000034,
+        10000038,10000039,10000041,10000042,10000043,10000052,10000054,
+        10000055,10000058,10000059,10000061,10000064,10000066,10000067,
+        10000069,10000070,10000072,10000074,10000077,10000081,10000083,
+        10000086,10000088,10000090,10000092,10000094,10000095,10000096,
+        10000098,10000099,10000101,10000102,10000103,10000104,10000106,
+        10000107,10000109,10000110,
+      ];
+      return fiveStars.includes(avatarId) ? 5 : 4;
+    }
+
+    function formatStatName(propId) {
+      const map = {
+        FIGHT_PROP_HP: 'HP',
+        FIGHT_PROP_ATTACK: 'ATK',
+        FIGHT_PROP_HP_PERCENT: 'HP%',
+        FIGHT_PROP_ATTACK_PERCENT: 'ATK%',
+        FIGHT_PROP_DEFENSE_PERCENT: 'DEF%',
+        FIGHT_PROP_ELEMENT_MASTERY: 'EM',
+        FIGHT_PROP_CHARGE_EFFICIENCY: 'ER%',
+        FIGHT_PROP_CRITICAL: 'CR%',
+        FIGHT_PROP_CRITICAL_HURT: 'CD%',
+        FIGHT_PROP_FIRE_ADD_HURT: 'Pyro%',
+        FIGHT_PROP_WATER_ADD_HURT: 'Hydro%',
+        FIGHT_PROP_WIND_ADD_HURT: 'Anemo%',
+        FIGHT_PROP_ELEC_ADD_HURT: 'Electro%',
+        FIGHT_PROP_GRASS_ADD_HURT: 'Dendro%',
+        FIGHT_PROP_ICE_ADD_HURT: 'Cryo%',
+        FIGHT_PROP_ROCK_ADD_HURT: 'Geo%',
+        FIGHT_PROP_PHYSICAL_ADD_HURT: 'Phys%',
+        FIGHT_PROP_HEAL_ADD: 'Heal%',
+      };
+      return map[propId] || propId?.replace('FIGHT_PROP_', '').replace(/_/g, ' ') || '?';
+    }
+
+    // ── UI STATE ──
+    function setState(state, msg) {
+      document.getElementById('loadingBox').classList.toggle('visible', state === 'loading');
+      document.getElementById('errorBox').classList.toggle('visible', state === 'error');
+      document.getElementById('playerCard').classList.toggle('visible', state === 'player');
+
+      if (state === 'loading') {
+        // Reset loading message and hide previous results
+        const loadingMsg = document.getElementById('loadingMsg');
+        if (loadingMsg) loadingMsg.textContent = 'Отримуємо дані з Enka.Network';
+        document.getElementById('charsSection').style.display = 'none';
+        document.getElementById('charsList').classList.remove('visible');
+        document.getElementById('noChars').classList.remove('visible');
+        document.getElementById('wishNote').classList.remove('visible');
+      }
+
+      if (state === 'error') {
+        document.getElementById('errorMsg').textContent = msg || 'Невідома помилка';
+        document.getElementById('charsSection').style.display = 'none';
+        document.getElementById('charsList').classList.remove('visible');
+        document.getElementById('noChars').classList.remove('visible');
+        document.getElementById('wishNote').classList.remove('visible');
+      }
+    }
+
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 2800);
+    }
+
+    // ── KEYBOARD ──
+    document.getElementById('uidInput').addEventListener('keydown', e => {
+      if (e.key === 'Enter') fetchPlayer();
+    });
+    // Strip non-digit characters on input
+    document.getElementById('uidInput').addEventListener('input', e => {
+      const cleaned = e.target.value.replace(/\D/g, '').slice(0, 10);
+      if (e.target.value !== cleaned) e.target.value = cleaned;
+    });
+
+    // ── INIT ──
+    if (tg?.initDataUnsafe?.user) {
+      showToast(`Привіт, ${tg.initDataUnsafe.user.first_name}! 👋`);
+    }
+  </script>
+</body>
+</html>
