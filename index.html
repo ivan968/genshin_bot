@@ -923,53 +923,32 @@
     const ENKA_BASE = 'https://enka.network';
     const ICON_BASE = 'https://enka.network/ui/';
 
-    // IMPORTANT: When running from file:// or Telegram WebApp, origin is "null".
-    // Many CORS proxies block null origin. Only these are confirmed to work with null origin:
-    //
-    //  1. allorigins.win  — open to all origins, wraps in JSON (.contents field)
-    //  2. jsonp.afeld.me  — open, plain pass-through (deprecated but still up)
-    //  3. worker.enka  — Enka's own public CORS worker (most reliable, direct)
-    //
-    // We try direct enka first (works in Telegram WebApp which sends real origin),
-    // then fall back to proxies for file:// or blocked environments.
-
+    // Proxies tried in order. allorigins wraps in JSON, raw gives plain text.
+    // corsproxy.io is reliable in Telegram WebApp context.
     const PROXIES = [
-      // 0 — Direct (works in Telegram WebApp, fails on file://)
       {
-        name: 'Enka direct',
-        build: url => url,
-        unwrap: text => text,
-        directOnly: true,   // skip if origin is null (file://)
-      },
-      // 1 — allorigins /get — wraps response in { contents, status }
-      {
-        name: 'AllOrigins /get',
-        build: url => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
-        unwrap: text => {
-          const j = JSON.parse(text);
-          // allorigins returns status.http_code separately
-          if (j?.status?.http_code && j.status.http_code !== 200) {
-            throw Object.assign(new Error('upstream'), { httpCode: j.status.http_code });
-          }
-          return j.contents;
-        },
-      },
-      // 2 — allorigins /raw — plain pass-through, sometimes fails with null origin too
-      {
-        name: 'AllOrigins /raw',
+        name: 'AllOrigins (raw)',
         build: url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
         unwrap: text => text,
       },
-      // 3 — jsonp.afeld.me — deprecated CORS Anywhere instance, still works
       {
-        name: 'afeld CORS',
-        build: url => `https://cors-anywhere.herokuapp.com/${url}`,
+        name: 'AllOrigins (get)',
+        build: url => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
+        unwrap: text => { const j = JSON.parse(text); return j.contents; },
+      },
+      {
+        name: 'corsproxy.io',
+        build: url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
         unwrap: text => text,
       },
-      // 4 — workers.dev open proxy (community)
       {
-        name: 'yacdn',
-        build: url => `https://yacdn.org/proxy/${url}`,
+        name: 'thingproxy',
+        build: url => `https://thingproxy.freeboard.io/fetch/${url}`,
+        unwrap: text => text,
+      },
+      {
+        name: 'jsonp.afeld.me',
+        build: url => `https://cors-anywhere-damp.vercel.app/api?url=${encodeURIComponent(url)}`,
         unwrap: text => text,
       },
     ];
@@ -977,113 +956,95 @@
     let characterData = {};
     let weaponData = {};
 
-    // Detect null origin (file:// or some Telegram builds)
-    const IS_NULL_ORIGIN = (location.protocol === 'file:' || location.origin === 'null');
-
     // ── ROBUST FETCH with retry across proxies ──
     async function fetchWithRetry(targetUrl) {
       let lastError;
-      let proxyIndex = 0;
 
-      const codeMap = {
-        400: 'Неправильний UID',
-        404: 'Гравець не знайдений або профіль закритий',
-        429: 'Забагато запитів — зачекай ~15 секунд і спробуй ще раз',
-        424: 'Сервер Genshin тимчасово недоступний, спробуй пізніше',
-      };
-
-      for (const proxy of PROXIES) {
-        // Skip direct fetch when running from file:// — will always be CORS-blocked
-        if (proxy.directOnly && IS_NULL_ORIGIN) continue;
-
-        const idx = proxyIndex++;
+      for (let i = 0; i < PROXIES.length; i++) {
+        const proxy = PROXIES[i];
         const msgEl = document.getElementById('loadingMsg');
         if (msgEl) {
-          msgEl.textContent = idx === 0
+          msgEl.textContent = i === 0
             ? 'Отримуємо дані з Enka.Network…'
-            : `Резервний канал ${idx} (${proxy.name})…`;
+            : `Спроба ${i + 1}/${PROXIES.length} (${proxy.name})…`;
         }
 
         for (let attempt = 0; attempt < 2; attempt++) {
           try {
             const controller = new AbortController();
-            const tid = setTimeout(() => controller.abort(), 14000);
-
+            const tid = setTimeout(() => controller.abort(), 12000);
             const resp = await fetch(proxy.build(targetUrl), {
               signal: controller.signal,
               cache: 'no-store',
-              // Some proxies need these headers
-              headers: proxy.directOnly ? {} : { 'X-Requested-With': 'XMLHttpRequest' },
             });
             clearTimeout(tid);
 
-            // Proxies that pass-through Enka's HTTP status directly
-            if (codeMap[resp.status]) {
+            // Immediately handle Enka's own well-known status codes
+            // (some proxies pass them through, some wrap as 200)
+            if ([400, 404, 429, 424].includes(resp.status)) {
+              const codeMap = {
+                400: 'Неправильний UID',
+                404: 'Гравець не знайдений або профіль закритий',
+                429: 'Забагато запитів — зачекай ~15 секунд і спробуй ще раз',
+                424: 'Сервер Genshin тимчасово недоступний, спробуй пізніше',
+              };
               return { ok: false, status: resp.status, msg: codeMap[resp.status] };
             }
 
-            if (resp.status !== 200) {
-              lastError = new Error(`${proxy.name}: HTTP ${resp.status}`);
-              // 5xx → retry once
-              if (resp.status >= 500 && attempt === 0) { await sleep(800); continue; }
-              break; // next proxy
-            }
+            if (resp.status === 200) {
+              let raw;
+              try { raw = await resp.text(); } catch { break; }
 
-            // Read body
-            let raw;
-            try { raw = await resp.text(); } catch (e) {
-              lastError = new Error(`${proxy.name}: не вдалося прочитати відповідь`);
-              break;
-            }
-
-            if (!raw || raw.length < 10) {
-              lastError = new Error(`${proxy.name}: порожня відповідь`);
-              break;
-            }
-
-            // HTML error page from proxy
-            if (raw.trimStart().startsWith('<!') || raw.trimStart().startsWith('<html')) {
-              lastError = new Error(`${proxy.name}: повернув HTML сторінку`);
-              break;
-            }
-
-            // Unwrap proxy envelope (e.g. allorigins wraps in {contents, status})
-            let bodyText;
-            try {
-              bodyText = proxy.unwrap(raw);
-            } catch (e) {
-              // allorigins threw httpCode error
-              if (e.httpCode && codeMap[e.httpCode]) {
-                return { ok: false, status: e.httpCode, msg: codeMap[e.httpCode] };
+              // Proxy returned empty / HTML error page
+              if (!raw || raw.trim().startsWith('<!')) {
+                lastError = new Error(`${proxy.name}: порожня відповідь`);
+                break;
               }
-              lastError = new Error(`${proxy.name}: unwrap failed — ${e.message}`);
-              break;
+
+              let bodyText;
+              try { bodyText = proxy.unwrap(raw); } catch {
+                lastError = new Error(`${proxy.name}: не вдалося розпакувати`);
+                break;
+              }
+
+              if (!bodyText || bodyText.trim() === '') {
+                lastError = new Error(`${proxy.name}: пусте тіло`);
+                break;
+              }
+
+              let json;
+              try { json = JSON.parse(bodyText); } catch {
+                // bodyText might be truncated or garbled — try next proxy
+                lastError = new Error(`${proxy.name}: невалідний JSON`);
+                break;
+              }
+
+              // Enka returns retcode/message on known errors even with HTTP 200
+              if (json?.retcode) {
+                const enkaErrors = {
+                  400: 'Неправильний UID',
+                  404: 'Гравець не знайдений або профіль закритий',
+                  429: 'Забагато запитів — зачекай ~15 секунд',
+                  424: 'Сервер Genshin недоступний, спробуй пізніше',
+                };
+                return { ok: false, status: json.retcode, msg: enkaErrors[json.retcode] || `Помилка Enka (${json.retcode})` };
+              }
+
+              if (!json?.playerInfo) {
+                lastError = new Error(`${proxy.name}: відповідь без playerInfo`);
+                break;
+              }
+
+              return { ok: true, data: json };
             }
 
-            if (!bodyText || bodyText.trim() === '') {
-              lastError = new Error(`${proxy.name}: пусте тіло після unwrap`);
-              break;
+            // 5xx from proxy — retry once
+            lastError = new Error(`${proxy.name}: HTTP ${resp.status}`);
+            if (resp.status >= 500 && attempt === 0) {
+              await sleep(900);
+              continue;
             }
-
-            // Parse JSON
-            let json;
-            try { json = JSON.parse(bodyText); } catch {
-              lastError = new Error(`${proxy.name}: невалідний JSON`);
-              break; // garbled — try next proxy
-            }
-
-            // Enka error retcode in body (sometimes HTTP 200 with error inside)
-            if (json?.retcode && json.retcode !== 0) {
-              const msg = codeMap[json.retcode] || `Помилка Enka (${json.retcode})`;
-              return { ok: false, status: json.retcode, msg };
-            }
-
-            if (!json?.playerInfo) {
-              lastError = new Error(`${proxy.name}: відповідь без playerInfo`);
-              break;
-            }
-
-            return { ok: true, data: json };
+            break;
 
           } catch (e) {
             if (e.name === 'AbortError') {
@@ -1098,7 +1059,7 @@
 
       return {
         ok: false,
-        msg: `Не вдалося отримати дані. Перевір підключення до інтернету або спробуй пізніше.\n(${lastError?.message || 'невідома помилка'})`,
+        msg: `Не вдалося підключитись. Перевір інтернет або спробуй пізніше.\n(${lastError?.message || 'невідома помилка'})`,
       };
     }
 
