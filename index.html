@@ -5,423 +5,767 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Genshin Stats</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap" rel="stylesheet" />
   <style>
+
+    /* ═══════════════════════════════════════════════
+       § 1. DESIGN TOKENS
+       All colors, sizes, and shadows in one place.
+       Change here → changes everywhere.
+    ═══════════════════════════════════════════════ */
     :root {
-      --gold: #c8a96e;
-      --gold-light: #f0d49a;
-      --gold-dim: #7a6033;
-      --ink: #0d0e12;
-      --surface: #12141a;
-      --surface2: #191c26;
-      --surface3: #1f2332;
-      --border: rgba(200,169,110,0.2);
-      --border-bright: rgba(200,169,110,0.5);
-      --text: #e8dcc8;
-      --text-dim: #8a7d6a;
-      --pyro: #ff6b35;
-      --hydro: #4fc3f7;
-      --anemo: #80cbc4;
-      --electro: #ce93d8;
-      --dendro: #81c784;
-      --cryo: #b3e5fc;
-      --geo: #ffd54f;
-      --5star: #ffd700;
-      --4star: #9c6bcc;
+      /* Gold palette */
+      --gold-bright:  #f5dea3;
+      --gold:         #c8a96e;
+      --gold-muted:   #9a7a45;
+      --gold-dim:     #5c4a28;
+
+      /* Backgrounds — dark navy-brown like the Genshin UI */
+      --bg-base:      #0c0d11;
+      --bg-panel:     #13151d;
+      --bg-card:      #181b25;
+      --bg-inset:     #1d2030;
+      --bg-deep:      #101218;
+
+      /* Borders */
+      --border-soft:   rgba(200,169,110,0.15);
+      --border-mid:    rgba(200,169,110,0.30);
+      --border-bright: rgba(200,169,110,0.55);
+
+      /* Text */
+      --text-primary:  #ede0cc;
+      --text-secondary:#9a8e7c;
+      --text-dim:      #5e5548;
+
+      /* Element colors */
+      --pyro:    #f87c52;
+      --hydro:   #56c0f0;
+      --anemo:   #73c9be;
+      --electro: #c07de0;
+      --dendro:  #7dc87a;
+      --cryo:    #9dd5f3;
+      --geo:     #f5c842;
+
+      /* Rarity */
+      --star-5:  #f5c518;
+      --star-4:  #a77dd4;
+
+      /* Spacing scale */
+      --space-xs:  4px;
+      --space-sm:  8px;
+      --space-md:  14px;
+      --space-lg:  20px;
+      --space-xl:  28px;
+
+      /* Radius scale */
+      --r-sm:   8px;
+      --r-md:   12px;
+      --r-lg:   18px;
+      --r-pill: 999px;
+
+      /* Typography */
+      --font-display: 'Cinzel', 'Times New Roman', serif;
+      --font-body:    'Crimson Pro', Georgia, serif;
+
+      /* Shadows */
+      --shadow-gold:   0 0 24px rgba(200,169,110,0.18);
+      --shadow-panel:  0 4px 24px rgba(0,0,0,0.45);
+      --shadow-card:   0 2px 12px rgba(0,0,0,0.35);
     }
 
-    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+    /* ═══════════════════════════════════════════════
+       § 2. RESET & BASE
+    ═══════════════════════════════════════════════ */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0; padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
 
     body {
-      font-family: 'Crimson Pro', Georgia, serif;
-      background: var(--ink);
-      color: var(--text);
+      font-family: var(--font-body);
+      background: var(--bg-base);
+      color: var(--text-primary);
       min-height: 100vh;
       overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
     }
 
-    /* ── BACKGROUND ── */
-    .bg-layer {
+
+    /* ═══════════════════════════════════════════════
+       § 3. BACKGROUND LAYERS
+       Three layers: base gradient + diamond pattern + ambient glows
+    ═══════════════════════════════════════════════ */
+    .bg-base {
       position: fixed; inset: 0; z-index: 0;
-      background:
-        radial-gradient(ellipse 80% 60% at 50% -10%, rgba(200,169,110,0.07) 0%, transparent 60%),
-        radial-gradient(ellipse 60% 80% at 90% 50%, rgba(79,195,247,0.04) 0%, transparent 50%),
-        radial-gradient(ellipse 50% 70% at 10% 80%, rgba(206,147,216,0.04) 0%, transparent 50%);
-      pointer-events: none;
+      background: radial-gradient(ellipse 120% 70% at 50% 0%,
+        rgba(28,22,12,0.9) 0%, var(--bg-base) 55%);
     }
+
+    /* Subtle Genshin-style diamond/hexagon tile */
     .bg-pattern {
       position: fixed; inset: 0; z-index: 0;
-      background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' stroke='rgba(200,169,110,0.04)' stroke-width='0.5'%3E%3Cpolygon points='30,2 57,17 57,43 30,58 3,43 3,17'/%3E%3C/g%3E%3C/svg%3E");
+      opacity: 1;
+      background-image: url("data:image/svg+xml,%3Csvg width='80' height='80' viewBox='0 0 80 80' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' stroke='rgba(200,169,110,0.055)' stroke-width='0.6'%3E%3Cpath d='M40 4 L76 22 L76 58 L40 76 L4 58 L4 22 Z'/%3E%3C/g%3E%3C/svg%3E");
       pointer-events: none;
     }
 
-    /* ── LAYOUT ── */
-    .app { position: relative; z-index: 1; max-width: 480px; margin: 0 auto; min-height: 100vh; }
+    /* Ambient colored glows */
+    .bg-glows {
+      position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      background:
+        radial-gradient(ellipse 70% 40% at 50% -5%,  rgba(200,169,110,0.06) 0%, transparent 65%),
+        radial-gradient(ellipse 40% 50% at 95% 40%,  rgba(86,192,240,0.035) 0%, transparent 55%),
+        radial-gradient(ellipse 35% 45% at 5%  75%,  rgba(192,125,224,0.03) 0%, transparent 55%);
+    }
 
-    /* ── HEADER ── */
+
+    /* ═══════════════════════════════════════════════
+       § 4. LAYOUT
+    ═══════════════════════════════════════════════ */
+    .app {
+      position: relative; z-index: 1;
+      max-width: 480px;
+      margin: 0 auto;
+      min-height: 100vh;
+    }
+
+    .content { padding: var(--space-lg); }
+
+
+    /* ═══════════════════════════════════════════════
+       § 5. HEADER
+    ═══════════════════════════════════════════════ */
     header {
-      padding: 20px 20px 16px;
-      display: flex; align-items: center; gap: 14px;
-      border-bottom: 1px solid var(--border);
-      background: linear-gradient(180deg, rgba(13,14,18,0.95) 0%, transparent 100%);
       position: sticky; top: 0; z-index: 100;
-      backdrop-filter: blur(12px);
+      padding: 16px var(--space-lg) 14px;
+      display: flex; align-items: center; gap: var(--space-md);
+      background: linear-gradient(180deg,
+        rgba(12,13,17,0.97) 0%,
+        rgba(12,13,17,0.82) 80%,
+        transparent 100%);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--border-soft);
     }
+
+    /* Ornate logo mark */
     .logo {
-      width: 42px; height: 42px;
-      background: linear-gradient(135deg, var(--gold) 0%, var(--gold-light) 100%);
-      border-radius: 50%;
+      width: 40px; height: 40px;
+      flex-shrink: 0;
       display: flex; align-items: center; justify-content: center;
-      font-size: 20px; flex-shrink: 0;
-      box-shadow: 0 0 20px rgba(200,169,110,0.4);
+      position: relative;
     }
-    header h1 {
-      font-family: 'Cinzel', serif;
-      font-size: 17px; font-weight: 600;
-      letter-spacing: 0.05em;
-      color: var(--gold-light);
+    .logo::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: linear-gradient(135deg, var(--gold-muted), var(--gold-dim));
+      clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+      opacity: 0.6;
+    }
+    .logo-inner {
+      position: relative; z-index: 1;
+      font-size: 18px; line-height: 1;
+      filter: drop-shadow(0 0 6px rgba(200,169,110,0.6));
+    }
+
+    .header-text h1 {
+      font-family: var(--font-display);
+      font-size: 16px; font-weight: 600;
+      letter-spacing: 0.08em;
+      color: var(--gold-bright);
       line-height: 1.2;
     }
-    header p { font-size: 12px; color: var(--text-dim); margin-top: 1px; }
-
-    /* ── CONTENT ── */
-    .content { padding: 20px; }
-
-    /* ── UID INPUT ── */
-    .uid-section {
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 20px;
-      margin-bottom: 20px;
+    .header-text p {
+      font-size: 11px; color: var(--text-secondary);
+      margin-top: 2px; letter-spacing: 0.04em;
     }
+
+
+    /* ═══════════════════════════════════════════════
+       § 6. DECORATIVE DIVIDER
+       Genshin-style ornamental horizontal rule
+    ═══════════════════════════════════════════════ */
+    .ornament-divider {
+      display: flex; align-items: center; gap: 10px;
+      margin: var(--space-lg) 0 var(--space-md);
+    }
+    .ornament-divider::before,
+    .ornament-divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--border-mid), transparent);
+    }
+    .ornament-diamond {
+      width: 6px; height: 6px;
+      background: var(--gold-muted);
+      transform: rotate(45deg);
+      flex-shrink: 0;
+    }
+
+    .section-title {
+      font-family: var(--font-display);
+      font-size: 11px; font-weight: 600;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--gold);
+      display: flex; align-items: center; gap: 10px;
+      margin: var(--space-xl) 0 var(--space-md);
+    }
+    .section-title::after {
+      content: '';
+      flex: 1; height: 1px;
+      background: linear-gradient(90deg, var(--border-mid), transparent);
+    }
+    .section-title-icon { font-size: 13px; }
+
+
+    /* ═══════════════════════════════════════════════
+       § 7. UID SEARCH PANEL
+    ═══════════════════════════════════════════════ */
+    .uid-section {
+      background: var(--bg-card);
+      border: 1px solid var(--border-soft);
+      border-radius: var(--r-lg);
+      padding: var(--space-lg);
+      margin-bottom: var(--space-lg);
+      box-shadow: var(--shadow-card);
+      /* Top accent line */
+      position: relative;
+      overflow: hidden;
+    }
+    .uid-section::before {
+      content: '';
+      position: absolute; top: 0; left: 10%; right: 10%;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--gold-muted), transparent);
+    }
+
     .uid-section label {
       display: block;
-      font-family: 'Cinzel', serif;
-      font-size: 11px;
-      letter-spacing: 0.12em;
+      font-family: var(--font-display);
+      font-size: 10px; font-weight: 600;
+      letter-spacing: 0.16em;
       color: var(--gold);
       text-transform: uppercase;
-      margin-bottom: 10px;
+      margin-bottom: var(--space-sm);
     }
-    .uid-row { display: flex; gap: 10px; }
+
+    .uid-row { display: flex; gap: var(--space-sm); }
+
     .uid-input {
       flex: 1;
-      background: var(--surface3);
-      border: 1px solid var(--border-bright);
-      border-radius: 10px;
-      padding: 12px 16px;
-      color: var(--gold-light);
-      font-family: 'Crimson Pro', serif;
-      font-size: 18px;
-      letter-spacing: 0.05em;
+      background: var(--bg-inset);
+      border: 1px solid var(--border-mid);
+      border-radius: var(--r-md);
+      padding: 11px 14px;
+      color: var(--gold-bright);
+      font-family: var(--font-display);
+      font-size: 16px;
+      letter-spacing: 0.06em;
       outline: none;
       transition: border-color 0.2s, box-shadow 0.2s;
     }
-    .uid-input::placeholder { color: var(--text-dim); font-size: 14px; }
+    .uid-input::placeholder {
+      color: var(--text-dim);
+      font-family: var(--font-body);
+      font-size: 14px;
+      letter-spacing: 0;
+    }
     .uid-input:focus {
       border-color: var(--gold);
-      box-shadow: 0 0 0 3px rgba(200,169,110,0.15);
+      box-shadow: 0 0 0 3px rgba(200,169,110,0.12), inset 0 1px 3px rgba(0,0,0,0.3);
     }
+
     .btn-search {
-      background: linear-gradient(135deg, var(--gold) 0%, #a8863c 100%);
-      border: none; border-radius: 10px;
-      padding: 12px 18px;
-      color: var(--ink);
-      font-family: 'Cinzel', serif;
-      font-size: 13px; font-weight: 700;
+      background: linear-gradient(160deg, var(--gold) 0%, #9a7030 100%);
+      border: none;
+      border-radius: var(--r-md);
+      padding: 11px 20px;
+      color: #1a1208;
+      font-family: var(--font-display);
+      font-size: 12px; font-weight: 700;
+      letter-spacing: 0.08em;
       cursor: pointer;
-      transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s;
       white-space: nowrap;
-      letter-spacing: 0.05em;
+      position: relative; overflow: hidden;
+      transition: transform 0.15s, box-shadow 0.2s, opacity 0.15s;
+      box-shadow: 0 2px 10px rgba(200,169,110,0.25);
     }
-    .btn-search:hover { transform: translateY(-1px); box-shadow: 0 4px 16px rgba(200,169,110,0.4); }
-    .btn-search:active { transform: translateY(0); }
-    .btn-search:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .btn-search::after {
+      content: '';
+      position: absolute; inset: 0;
+      background: linear-gradient(180deg, rgba(255,255,255,0.14) 0%, transparent 60%);
+      pointer-events: none;
+    }
+    .btn-search:hover  { transform: translateY(-1px); box-shadow: 0 4px 18px rgba(200,169,110,0.38); }
+    .btn-search:active { transform: translateY(0); box-shadow: none; }
+    .btn-search:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
 
     .uid-hint {
-      font-size: 12px; color: var(--text-dim);
-      margin-top: 10px; line-height: 1.5;
+      font-size: 12px; color: var(--text-secondary);
+      margin-top: var(--space-sm); line-height: 1.6;
     }
-    .uid-hint b { color: var(--gold-dim); font-weight: 600; }
+    .uid-hint b { color: var(--gold-muted); font-weight: 600; }
 
-    /* ── STATES ── */
+
+    /* ═══════════════════════════════════════════════
+       § 8. STATE BOXES (loading / error)
+    ═══════════════════════════════════════════════ */
     .state-box {
-      text-align: center; padding: 40px 20px;
+      text-align: center;
+      padding: 44px var(--space-lg);
       display: none;
     }
     .state-box.visible { display: block; }
-    .spinner {
-      width: 40px; height: 40px;
-      border: 3px solid var(--border);
+
+    /* Genshin-style spinner — rotating outer ring + inner dot */
+    .spinner-wrap {
+      position: relative;
+      width: 48px; height: 48px;
+      margin: 0 auto 18px;
+    }
+    .spinner-ring {
+      width: 100%; height: 100%;
+      border: 2px solid var(--border-soft);
       border-top-color: var(--gold);
+      border-right-color: var(--gold-muted);
       border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-      margin: 0 auto 16px;
+      animation: spin 1s cubic-bezier(0.4,0,0.2,1) infinite;
+    }
+    .spinner-dot {
+      position: absolute;
+      inset: 0; margin: auto;
+      width: 6px; height: 6px;
+      background: var(--gold);
+      border-radius: 50%;
+      transform: rotate(45deg) translateX(20px);
+      animation: spin 1s cubic-bezier(0.4,0,0.2,1) infinite;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
-    .state-icon { font-size: 36px; margin-bottom: 12px; }
-    .state-title { font-family: 'Cinzel', serif; font-size: 16px; color: var(--gold); margin-bottom: 6px; }
-    .state-msg { font-size: 14px; color: var(--text-dim); line-height: 1.5; max-width: 280px; margin: 0 auto; }
 
-    /* ── PLAYER CARD ── */
+    .state-icon  { font-size: 34px; margin-bottom: 12px; }
+    .state-title {
+      font-family: var(--font-display);
+      font-size: 15px; font-weight: 600;
+      color: var(--gold);
+      margin-bottom: 6px; letter-spacing: 0.05em;
+    }
+    .state-msg {
+      font-size: 14px; color: var(--text-secondary);
+      line-height: 1.6; max-width: 270px;
+      margin: 0 auto;
+    }
+
+
+    /* ═══════════════════════════════════════════════
+       § 9. PLAYER CARD
+    ═══════════════════════════════════════════════ */
     .player-card {
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 20px;
-      margin-bottom: 20px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-soft);
+      border-radius: var(--r-lg);
+      overflow: hidden;
+      margin-bottom: var(--space-lg);
       display: none;
-      animation: fadeUp 0.4s ease;
+      box-shadow: var(--shadow-panel);
+      animation: fadeUp 0.45s cubic-bezier(0.22,1,0.36,1) both;
     }
     .player-card.visible { display: block; }
-    @keyframes fadeUp {
-      from { opacity: 0; transform: translateY(16px); }
-      to { opacity: 1; transform: translateY(0); }
+
+    /* Decorative header strip */
+    .player-banner {
+      background: linear-gradient(135deg, #1a1710 0%, #0f1018 60%, #131620 100%);
+      padding: var(--space-lg) var(--space-lg) var(--space-md);
+      border-bottom: 1px solid var(--border-soft);
+      position: relative;
+      overflow: hidden;
+    }
+    .player-banner::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+      background-image: url("data:image/svg+xml,%3Csvg width='80' height='80' viewBox='0 0 80 80' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' stroke='rgba(200,169,110,0.04)' stroke-width='0.6'%3E%3Cpath d='M40 4 L76 22 L76 58 L40 76 L4 58 L4 22 Z'/%3E%3C/g%3E%3C/svg%3E");
+      pointer-events: none;
+    }
+    .player-banner::after {
+      content: '';
+      position: absolute; top: 0; left: 15%; right: 15%;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--gold-muted), transparent);
     }
 
     .player-header {
-      display: flex; gap: 14px; align-items: flex-start;
-      margin-bottom: 16px;
+      display: flex; gap: var(--space-md); align-items: flex-start;
+      position: relative; z-index: 1;
     }
+
     .player-avatar {
-      width: 60px; height: 60px; border-radius: 50%;
-      border: 2px solid var(--gold);
-      background: var(--surface3);
+      width: 64px; height: 64px;
+      border-radius: var(--r-md);
+      border: 2px solid var(--gold-muted);
+      background: var(--bg-inset);
       display: flex; align-items: center; justify-content: center;
       font-size: 28px; flex-shrink: 0;
       overflow: hidden;
+      box-shadow: 0 0 16px rgba(200,169,110,0.2), inset 0 1px 0 rgba(255,255,255,0.05);
     }
     .player-avatar img { width: 100%; height: 100%; object-fit: cover; }
-    .player-info { flex: 1; min-width: 0; }
+
+    .player-info { flex: 1; min-width: 0; padding-top: 2px; }
     .player-name {
-      font-family: 'Cinzel', serif; font-size: 18px; font-weight: 600;
-      color: var(--gold-light);
+      font-family: var(--font-display);
+      font-size: 18px; font-weight: 600;
+      color: var(--gold-bright);
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      line-height: 1.2;
     }
-    .player-uid { font-size: 13px; color: var(--text-dim); margin: 2px 0 6px; }
+    .player-uid {
+      font-size: 12px; color: var(--text-secondary);
+      margin: 3px 0 6px;
+      letter-spacing: 0.04em;
+    }
     .player-sig {
-      font-size: 13px; color: var(--text); font-style: italic;
-      opacity: 0.8; line-height: 1.4;
+      font-size: 13px; color: var(--text-primary);
+      font-style: italic; opacity: 0.75;
+      line-height: 1.4;
     }
+
+    /* Stats grid inside player card */
+    .player-stats { padding: var(--space-md) var(--space-lg) var(--space-lg); }
 
     .stats-grid {
       display: grid; grid-template-columns: repeat(3, 1fr);
-      gap: 8px;
+      gap: 6px;
     }
     .stat-item {
-      background: var(--surface3);
-      border-radius: 10px; padding: 10px 8px;
+      background: var(--bg-inset);
+      border: 1px solid var(--border-soft);
+      border-radius: var(--r-sm);
+      padding: 10px 6px;
       text-align: center;
+      transition: border-color 0.2s;
     }
+    .stat-item:hover { border-color: var(--border-mid); }
     .stat-val {
-      font-family: 'Cinzel', serif; font-size: 18px;
-      font-weight: 700; color: var(--gold-light);
       display: block;
+      font-family: var(--font-display);
+      font-size: 17px; font-weight: 700;
+      color: var(--gold-bright);
+      line-height: 1;
     }
-    .stat-lbl { font-size: 10px; color: var(--text-dim); margin-top: 2px; letter-spacing: 0.05em; }
-
-    /* ── SECTION TITLE ── */
-    .section-title {
-      font-family: 'Cinzel', serif;
-      font-size: 12px;
-      letter-spacing: 0.15em;
-      text-transform: uppercase;
-      color: var(--gold);
-      margin: 20px 0 12px;
-      display: flex; align-items: center; gap: 10px;
-    }
-    .section-title::after {
-      content: ''; flex: 1;
-      height: 1px; background: var(--border);
+    .stat-lbl {
+      font-size: 10px; color: var(--text-secondary);
+      margin-top: 3px; letter-spacing: 0.04em;
     }
 
-    /* ── CHARACTER CARDS ── */
-    .chars-list { display: flex; flex-direction: column; gap: 12px; display: none; }
+
+    /* ═══════════════════════════════════════════════
+       § 10. CHARACTER CARDS
+    ═══════════════════════════════════════════════ */
+    .chars-list {
+      display: none; flex-direction: column; gap: 10px;
+    }
     .chars-list.visible { display: flex; }
 
     .char-card {
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 14px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-soft);
+      border-radius: var(--r-lg);
       overflow: hidden;
-      animation: fadeUp 0.4s ease both;
+      animation: fadeUp 0.4s cubic-bezier(0.22,1,0.36,1) both;
+      transition: border-color 0.2s, box-shadow 0.2s;
     }
+    .char-card:hover { border-color: var(--border-mid); }
+    .char-card.open  { border-color: var(--border-mid); box-shadow: var(--shadow-card); }
+
+    /* Rarity left accent bar */
+    .char-card.rarity-5 { border-left: 3px solid rgba(245,197,24,0.5); }
+    .char-card.rarity-4 { border-left: 3px solid rgba(167,125,212,0.5); }
+
     .char-header {
-      display: flex; align-items: center; gap: 14px;
-      padding: 14px 16px; cursor: pointer;
-      position: relative;
+      display: flex; align-items: center; gap: var(--space-md);
+      padding: 12px 14px 12px 12px;
+      cursor: pointer;
+      user-select: none;
     }
+
     .char-avatar {
-      width: 56px; height: 56px;
-      border-radius: 12px;
-      background: var(--surface3);
+      width: 54px; height: 54px;
+      border-radius: var(--r-sm);
+      background: var(--bg-inset);
       overflow: hidden; flex-shrink: 0;
       display: flex; align-items: center; justify-content: center;
-      font-size: 26px;
-      border: 2px solid transparent;
-      transition: border-color 0.2s;
+      font-size: 24px;
+      border: 1px solid transparent;
     }
     .char-avatar img { width: 100%; height: 100%; object-fit: cover; }
-    .rarity-5 .char-avatar { border-color: rgba(255,215,0,0.5); }
-    .rarity-4 .char-avatar { border-color: rgba(156,107,204,0.5); }
+    .rarity-5 .char-avatar { border-color: rgba(245,197,24,0.3); }
+    .rarity-4 .char-avatar { border-color: rgba(167,125,212,0.3); }
 
     .char-meta { flex: 1; min-width: 0; }
     .char-name {
-      font-family: 'Cinzel', serif; font-size: 15px; font-weight: 600;
-      color: var(--text); line-height: 1.2; margin-bottom: 4px;
+      font-family: var(--font-display);
+      font-size: 14px; font-weight: 600;
+      color: var(--text-primary);
+      line-height: 1.2; margin-bottom: 5px;
     }
-    .char-sub { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-    .char-level {
-      font-size: 12px; color: var(--text-dim);
+    .char-sub {
+      display: flex; align-items: center;
+      gap: 6px; flex-wrap: wrap;
     }
+
+    .rarity-stars { font-size: 10px; line-height: 1; }
+    .rarity-5 .rarity-stars { color: var(--star-5); }
+    .rarity-4 .rarity-stars { color: var(--star-4); }
+
     .char-element {
       width: 18px; height: 18px; border-radius: 50%;
       display: inline-flex; align-items: center; justify-content: center;
-      font-size: 10px;
+      font-size: 10px; flex-shrink: 0;
     }
+
+    .char-level {
+      font-size: 11px; color: var(--text-secondary);
+    }
+
     .constellation-badge {
-      background: rgba(200,169,110,0.15);
-      border: 1px solid var(--border);
-      border-radius: 20px;
-      font-size: 11px; padding: 1px 7px;
-      color: var(--gold-dim);
-      font-family: 'Cinzel', serif;
+      background: rgba(200,169,110,0.1);
+      border: 1px solid var(--border-soft);
+      border-radius: var(--r-pill);
+      font-size: 10px; padding: 1px 6px;
+      color: var(--gold-muted);
+      font-family: var(--font-display);
+      letter-spacing: 0.04em;
     }
-    .rarity-stars {
-      font-size: 11px;
-    }
-    .rarity-5 .rarity-stars { color: var(--5star); }
-    .rarity-4 .rarity-stars { color: var(--4star); }
 
     .expand-arrow {
-      color: var(--text-dim); font-size: 14px;
-      transition: transform 0.25s;
+      color: var(--text-dim); font-size: 12px;
+      transition: transform 0.3s cubic-bezier(0.22,1,0.36,1);
       flex-shrink: 0;
     }
     .char-card.open .expand-arrow { transform: rotate(180deg); }
 
-    /* ── CHAR DETAILS ── */
+
+    /* ═══════════════════════════════════════════════
+       § 11. CHARACTER DETAIL PANEL
+    ═══════════════════════════════════════════════ */
     .char-details {
-      display: none; padding: 0 16px 14px;
-      border-top: 1px solid var(--border);
-      padding-top: 14px;
+      display: none;
+      padding: var(--space-md) var(--space-md) var(--space-md);
+      border-top: 1px solid var(--border-soft);
+      background: var(--bg-deep);
     }
     .char-card.open .char-details { display: block; }
 
-    .detail-block { margin-bottom: 12px; }
+    .detail-block { margin-bottom: var(--space-md); }
+    .detail-block:last-child { margin-bottom: 0; }
+
     .detail-label {
-      font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase;
-      color: var(--gold); margin-bottom: 6px;
-      font-family: 'Cinzel', serif;
+      font-family: var(--font-display);
+      font-size: 9px; font-weight: 600;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin-bottom: 6px;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .detail-label::after {
+      content: ''; flex: 1; height: 1px;
+      background: linear-gradient(90deg, var(--border-soft), transparent);
     }
 
-    /* Weapon */
+    /* Weapon row */
     .weapon-row {
       display: flex; align-items: center; gap: 10px;
-      background: var(--surface3); border-radius: 10px; padding: 10px 12px;
+      background: var(--bg-inset);
+      border: 1px solid var(--border-soft);
+      border-radius: var(--r-md);
+      padding: 10px 12px;
     }
     .weapon-icon {
-      width: 40px; height: 40px; border-radius: 8px;
-      background: var(--surface2);
+      width: 42px; height: 42px;
+      border-radius: var(--r-sm);
+      background: var(--bg-card);
       display: flex; align-items: center; justify-content: center;
       font-size: 20px; flex-shrink: 0;
       overflow: hidden;
+      border: 1px solid var(--border-soft);
     }
     .weapon-icon img { width: 100%; height: 100%; object-fit: contain; }
-    .weapon-name { font-size: 14px; font-weight: 600; color: var(--text); }
-    .weapon-meta { font-size: 12px; color: var(--text-dim); }
+    .weapon-name { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+    .weapon-meta { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
 
-    /* Artifacts */
+    /* Artifacts grid */
     .artifacts-grid {
       display: grid; grid-template-columns: repeat(5, 1fr);
-      gap: 6px;
+      gap: 5px;
     }
     .artifact-slot {
-      background: var(--surface3); border-radius: 8px; padding: 6px;
-      display: flex; flex-direction: column; align-items: center; gap: 3px;
-      min-height: 64px; justify-content: center;
+      background: var(--bg-inset);
+      border: 1px solid var(--border-soft);
+      border-radius: var(--r-sm);
+      padding: 6px 4px;
+      display: flex; flex-direction: column;
+      align-items: center; gap: 4px;
+      min-height: 62px; justify-content: center;
     }
-    .artifact-slot.empty { opacity: 0.3; }
-    .artifact-icon { font-size: 20px; }
-    .artifact-icon img { width: 30px; height: 30px; object-fit: contain; }
-    .artifact-name { font-size: 8px; color: var(--text-dim); text-align: center; line-height: 1.2; }
+    .artifact-slot.empty {
+      opacity: 0.28;
+      border-style: dashed;
+    }
+    .artifact-icon { font-size: 18px; line-height: 1; }
+    .artifact-icon img { width: 28px; height: 28px; object-fit: contain; }
+    .artifact-name {
+      font-size: 8px; color: var(--text-secondary);
+      text-align: center; line-height: 1.2;
+      letter-spacing: 0.02em;
+    }
 
-    /* Fight Props */
+    /* Fight props grid */
     .props-grid {
-      display: grid; grid-template-columns: 1fr 1fr; gap: 6px;
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 5px;
     }
     .prop-item {
-      background: var(--surface3); border-radius: 8px;
-      padding: 7px 10px; display: flex; justify-content: space-between;
-      align-items: center;
+      background: var(--bg-inset);
+      border: 1px solid var(--border-soft);
+      border-radius: var(--r-sm);
+      padding: 7px 10px;
+      display: flex; justify-content: space-between; align-items: center;
     }
-    .prop-name { font-size: 11px; color: var(--text-dim); }
-    .prop-val { font-size: 13px; color: var(--gold-light); font-weight: 600;
-      font-family: 'Cinzel', serif; }
+    .prop-name { font-size: 11px; color: var(--text-secondary); }
+    .prop-val {
+      font-family: var(--font-display);
+      font-size: 12px; font-weight: 600;
+      color: var(--gold-bright);
+    }
 
-    /* ── WISH SECTION ── */
+
+    /* ═══════════════════════════════════════════════
+       § 12. ELEMENT COLOR PILLS
+       Used on .char-element spans
+    ═══════════════════════════════════════════════ */
+    .el-pyro    { background: rgba(248,124,82,0.18);  color: var(--pyro); }
+    .el-hydro   { background: rgba(86,192,240,0.18);  color: var(--hydro); }
+    .el-anemo   { background: rgba(115,201,190,0.18); color: var(--anemo); }
+    .el-electro { background: rgba(192,125,224,0.18); color: var(--electro); }
+    .el-dendro  { background: rgba(125,200,122,0.18); color: var(--dendro); }
+    .el-cryo    { background: rgba(157,213,243,0.18); color: var(--cryo); }
+    .el-geo     { background: rgba(245,200,66,0.18);  color: var(--geo); }
+
+
+    /* ═══════════════════════════════════════════════
+       § 13. WISH NOTE PANEL
+    ═══════════════════════════════════════════════ */
     .wish-note {
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 18px;
-      margin-bottom: 20px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-soft);
+      border-radius: var(--r-lg);
+      padding: var(--space-md) var(--space-lg);
+      margin-bottom: var(--space-lg);
       display: none;
       animation: fadeUp 0.4s ease;
     }
     .wish-note.visible { display: block; }
     .wish-note-title {
-      font-family: 'Cinzel', serif; font-size: 13px;
-      color: var(--gold); margin-bottom: 8px;
+      font-family: var(--font-display);
+      font-size: 12px; font-weight: 600;
+      color: var(--gold);
+      margin-bottom: 7px;
       display: flex; align-items: center; gap: 8px;
+      letter-spacing: 0.06em;
     }
-    .wish-note p { font-size: 13px; color: var(--text-dim); line-height: 1.6; }
+    .wish-note p { font-size: 13px; color: var(--text-secondary); line-height: 1.65; }
     .wish-note a {
       color: var(--gold); text-decoration: none;
       border-bottom: 1px solid var(--border-bright);
+      transition: color 0.15s;
     }
+    .wish-note a:hover { color: var(--gold-bright); }
 
-    /* ── BOTTOM SAFE AREA ── */
-    .bottom-pad { height: 30px; }
 
-    /* ── ELEMENT COLORS ── */
-    .el-pyro { background: rgba(255,107,53,0.2); color: var(--pyro); }
-    .el-hydro { background: rgba(79,195,247,0.2); color: var(--hydro); }
-    .el-anemo { background: rgba(128,203,196,0.2); color: var(--anemo); }
-    .el-electro { background: rgba(206,147,216,0.2); color: var(--electro); }
-    .el-dendro { background: rgba(129,199,132,0.2); color: var(--dendro); }
-    .el-cryo { background: rgba(179,229,252,0.2); color: var(--cryo); }
-    .el-geo { background: rgba(255,213,79,0.2); color: var(--geo); }
-
+    /* ═══════════════════════════════════════════════
+       § 14. EMPTY STATE
+    ═══════════════════════════════════════════════ */
     .no-chars {
-      text-align: center; padding: 30px;
-      background: var(--surface2); border: 1px solid var(--border);
-      border-radius: 14px; margin-bottom: 16px; display: none;
+      text-align: center; padding: 32px var(--space-lg);
+      background: var(--bg-card);
+      border: 1px dashed var(--border-mid);
+      border-radius: var(--r-lg);
+      margin-bottom: var(--space-md);
+      display: none;
     }
     .no-chars.visible { display: block; }
-    .no-chars p { font-size: 13px; color: var(--text-dim); line-height: 1.6; }
+    .no-chars p { font-size: 13px; color: var(--text-secondary); line-height: 1.7; }
 
-    /* ── TOAST ── */
+
+    /* ═══════════════════════════════════════════════
+       § 15. TOAST NOTIFICATION
+    ═══════════════════════════════════════════════ */
     .toast {
-      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px);
-      background: var(--surface2); border: 1px solid var(--border-bright);
-      border-radius: 10px; padding: 10px 18px;
-      font-size: 13px; color: var(--text);
-      opacity: 0; transition: all 0.3s; z-index: 999;
+      position: fixed; bottom: 28px; left: 50%;
+      transform: translateX(-50%) translateY(16px);
+      background: var(--bg-panel);
+      border: 1px solid var(--border-bright);
+      border-radius: var(--r-pill);
+      padding: 10px 20px;
+      font-size: 13px; color: var(--text-primary);
+      opacity: 0;
+      transition: opacity 0.25s, transform 0.3s cubic-bezier(0.22,1,0.36,1);
+      z-index: 999;
       white-space: nowrap; pointer-events: none;
+      box-shadow: var(--shadow-panel);
     }
-    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+
+    /* ═══════════════════════════════════════════════
+       § 16. ANIMATIONS
+    ═══════════════════════════════════════════════ */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(14px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+
+    /* ═══════════════════════════════════════════════
+       § 17. MISC
+    ═══════════════════════════════════════════════ */
+    .bottom-pad { height: 36px; }
+
+    .btn-retry {
+      background: transparent;
+      border: 1px solid var(--border-bright);
+      border-radius: var(--r-pill);
+      padding: 8px 20px;
+      color: var(--gold);
+      font-family: var(--font-display);
+      font-size: 12px; font-weight: 600;
+      letter-spacing: 0.06em;
+      cursor: pointer;
+      transition: background 0.2s, color 0.2s;
+    }
+    .btn-retry:hover {
+      background: rgba(200,169,110,0.1);
+      color: var(--gold-bright);
+    }
+
   </style>
 </head>
 <body>
-  <div class="bg-layer"></div>
+  <div class="bg-base"></div>
   <div class="bg-pattern"></div>
+  <div class="bg-glows"></div>
 
   <div class="app">
     <header>
-      <div class="logo">✦</div>
-      <div>
+      <div class="logo"><span class="logo-inner">✦</span></div>
+      <div class="header-text">
         <h1>Genshin Stats</h1>
         <p>Пошук по UID · Enka.Network</p>
       </div>
@@ -451,7 +795,10 @@
 
       <!-- Loading -->
       <div class="state-box" id="loadingBox">
-        <div class="spinner"></div>
+        <div class="spinner-wrap">
+          <div class="spinner-ring"></div>
+          <div class="spinner-dot"></div>
+        </div>
         <div class="state-title">Завантаження...</div>
         <div class="state-msg" id="loadingMsg">Отримуємо дані з Enka.Network</div>
       </div>
@@ -461,42 +808,49 @@
         <div class="state-icon">⚠️</div>
         <div class="state-title">Помилка</div>
         <div class="state-msg" id="errorMsg">Щось пішло не так</div>
+        <button class="btn-retry" onclick="fetchPlayer()" style="margin-top:18px;">↺ Спробувати ще раз</button>
       </div>
 
       <!-- Player Card -->
       <div class="player-card" id="playerCard">
-        <div class="player-header">
-          <div class="player-avatar" id="playerAvatar">🌸</div>
-          <div class="player-info">
-            <div class="player-name" id="playerName">—</div>
-            <div class="player-uid" id="playerUidText">UID: —</div>
-            <div class="player-sig" id="playerSig"></div>
+        <!-- Banner with avatar + info -->
+        <div class="player-banner">
+          <div class="player-header">
+            <div class="player-avatar" id="playerAvatar">🌸</div>
+            <div class="player-info">
+              <div class="player-name" id="playerName">—</div>
+              <div class="player-uid" id="playerUidText">UID: —</div>
+              <div class="player-sig" id="playerSig"></div>
+            </div>
           </div>
         </div>
-        <div class="stats-grid">
-          <div class="stat-item">
-            <span class="stat-val" id="statAdv">—</span>
-            <div class="stat-lbl">⚔ Рівень AR</div>
-          </div>
-          <div class="stat-item">
-            <span class="stat-val" id="statWorld">—</span>
-            <div class="stat-lbl">🌍 Світ</div>
-          </div>
-          <div class="stat-item">
-            <span class="stat-val" id="statAchiev">—</span>
-            <div class="stat-lbl">🏆 Досягн.</div>
-          </div>
-          <div class="stat-item">
-            <span class="stat-val" id="statAbyss">—</span>
-            <div class="stat-lbl">🌀 Безодня</div>
-          </div>
-          <div class="stat-item">
-            <span class="stat-val" id="statTheater">—</span>
-            <div class="stat-lbl">🎭 Театр</div>
-          </div>
-          <div class="stat-item">
-            <span class="stat-val" id="statChars">—</span>
-            <div class="stat-lbl">👥 Вітрина</div>
+        <!-- Stats -->
+        <div class="player-stats">
+          <div class="stats-grid">
+            <div class="stat-item">
+              <span class="stat-val" id="statAdv">—</span>
+              <div class="stat-lbl">⚔ Рівень AR</div>
+            </div>
+            <div class="stat-item">
+              <span class="stat-val" id="statWorld">—</span>
+              <div class="stat-lbl">🌍 Світ</div>
+            </div>
+            <div class="stat-item">
+              <span class="stat-val" id="statAchiev">—</span>
+              <div class="stat-lbl">🏆 Досягн.</div>
+            </div>
+            <div class="stat-item">
+              <span class="stat-val" id="statAbyss">—</span>
+              <div class="stat-lbl">🌀 Безодня</div>
+            </div>
+            <div class="stat-item">
+              <span class="stat-val" id="statTheater">—</span>
+              <div class="stat-lbl">🎭 Театр</div>
+            </div>
+            <div class="stat-item">
+              <span class="stat-val" id="statChars">—</span>
+              <div class="stat-lbl">👥 Вітрина</div>
+            </div>
           </div>
         </div>
       </div>
@@ -513,7 +867,7 @@
 
       <!-- Characters -->
       <div id="charsSection" style="display:none">
-        <div class="section-title">Вітрина персонажів</div>
+        <div class="section-title"><span class="section-title-icon">✦</span> Вітрина персонажів</div>
         <div class="chars-list" id="charsList"></div>
       </div>
 
@@ -569,79 +923,186 @@
     const ENKA_BASE = 'https://enka.network';
     const ICON_BASE = 'https://enka.network/ui/';
 
-    // Multiple proxies tried in order — if one fails or gives server error, next is used
+    // IMPORTANT: When running from file:// or Telegram WebApp, origin is "null".
+    // Many CORS proxies block null origin. Only these are confirmed to work with null origin:
+    //
+    //  1. allorigins.win  — open to all origins, wraps in JSON (.contents field)
+    //  2. jsonp.afeld.me  — open, plain pass-through (deprecated but still up)
+    //  3. worker.enka  — Enka's own public CORS worker (most reliable, direct)
+    //
+    // We try direct enka first (works in Telegram WebApp which sends real origin),
+    // then fall back to proxies for file:// or blocked environments.
+
     const PROXIES = [
-      url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-      url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
-      url => `https://proxy.cors.sh/${url}`,
+      // 0 — Direct (works in Telegram WebApp, fails on file://)
+      {
+        name: 'Enka direct',
+        build: url => url,
+        unwrap: text => text,
+        directOnly: true,   // skip if origin is null (file://)
+      },
+      // 1 — allorigins /get — wraps response in { contents, status }
+      {
+        name: 'AllOrigins /get',
+        build: url => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
+        unwrap: text => {
+          const j = JSON.parse(text);
+          // allorigins returns status.http_code separately
+          if (j?.status?.http_code && j.status.http_code !== 200) {
+            throw Object.assign(new Error('upstream'), { httpCode: j.status.http_code });
+          }
+          return j.contents;
+        },
+      },
+      // 2 — allorigins /raw — plain pass-through, sometimes fails with null origin too
+      {
+        name: 'AllOrigins /raw',
+        build: url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+        unwrap: text => text,
+      },
+      // 3 — jsonp.afeld.me — deprecated CORS Anywhere instance, still works
+      {
+        name: 'afeld CORS',
+        build: url => `https://cors-anywhere.herokuapp.com/${url}`,
+        unwrap: text => text,
+      },
+      // 4 — workers.dev open proxy (community)
+      {
+        name: 'yacdn',
+        build: url => `https://yacdn.org/proxy/${url}`,
+        unwrap: text => text,
+      },
     ];
 
     let characterData = {};
     let weaponData = {};
 
+    // Detect null origin (file:// or some Telegram builds)
+    const IS_NULL_ORIGIN = (location.protocol === 'file:' || location.origin === 'null');
+
     // ── ROBUST FETCH with retry across proxies ──
-    async function fetchWithRetry(targetUrl, attempts = 3) {
-      const proxyNames = ['AllOrigins', 'CorsProxy.io', 'cors.sh'];
+    async function fetchWithRetry(targetUrl) {
       let lastError;
-      for (let i = 0; i < PROXIES.length; i++) {
-        const proxyUrl = PROXIES[i](targetUrl);
-        if (i > 0) {
-          const msgEl = document.getElementById('loadingMsg');
-          if (msgEl) msgEl.textContent = `Спроба через резервний сервер (${proxyNames[i]})…`;
+      let proxyIndex = 0;
+
+      const codeMap = {
+        400: 'Неправильний UID',
+        404: 'Гравець не знайдений або профіль закритий',
+        429: 'Забагато запитів — зачекай ~15 секунд і спробуй ще раз',
+        424: 'Сервер Genshin тимчасово недоступний, спробуй пізніше',
+      };
+
+      for (const proxy of PROXIES) {
+        // Skip direct fetch when running from file:// — will always be CORS-blocked
+        if (proxy.directOnly && IS_NULL_ORIGIN) continue;
+
+        const idx = proxyIndex++;
+        const msgEl = document.getElementById('loadingMsg');
+        if (msgEl) {
+          msgEl.textContent = idx === 0
+            ? 'Отримуємо дані з Enka.Network…'
+            : `Резервний канал ${idx} (${proxy.name})…`;
         }
-        for (let attempt = 0; attempt < attempts; attempt++) {
+
+        for (let attempt = 0; attempt < 2; attempt++) {
           try {
             const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 10000); // 10s timeout
-            const resp = await fetch(proxyUrl, { signal: controller.signal });
-            clearTimeout(timeout);
+            const tid = setTimeout(() => controller.abort(), 14000);
 
-            // Some proxies return 200 with an error body — parse and verify
-            if (resp.status === 200) {
-              const text = await resp.text();
-              // Check for empty or proxy error responses
-              if (!text || text.trim() === '' || text.includes('Error') && text.length < 100) {
-                lastError = new Error('Порожня відповідь від проксі');
-                break; // try next proxy
-              }
-              let json;
-              try { json = JSON.parse(text); } catch {
-                lastError = new Error('Невалідна відповідь');
-                break;
-              }
-              // Enka error codes in body
-              if (json?.uid && !json?.playerInfo) {
-                lastError = new Error('Дані недоступні (гравець офлайн?)');
-                break;
-              }
-              return { ok: true, data: json };
+            const resp = await fetch(proxy.build(targetUrl), {
+              signal: controller.signal,
+              cache: 'no-store',
+              // Some proxies need these headers
+              headers: proxy.directOnly ? {} : { 'X-Requested-With': 'XMLHttpRequest' },
+            });
+            clearTimeout(tid);
+
+            // Proxies that pass-through Enka's HTTP status directly
+            if (codeMap[resp.status]) {
+              return { ok: false, status: resp.status, msg: codeMap[resp.status] };
             }
 
-            // Map known HTTP status codes
-            if (resp.status === 400) return { ok: false, status: 400, msg: 'Неправильний UID' };
-            if (resp.status === 404) return { ok: false, status: 404, msg: 'Гравець не знайдений або профіль закритий' };
-            if (resp.status === 429) return { ok: false, status: 429, msg: 'Забагато запитів — зачекай ~10 секунд і спробуй ще раз' };
-            if (resp.status === 424) return { ok: false, status: 424, msg: 'Сервер Genshin тимчасово недоступний, спробуй пізніше' };
-
-            lastError = new Error(`Помилка проксі (HTTP ${resp.status})`);
-            // For 5xx — retry same proxy
-            if (resp.status >= 500 && attempt < attempts - 1) {
-              await new Promise(r => setTimeout(r, 800 * (attempt + 1)));
-              continue;
+            if (resp.status !== 200) {
+              lastError = new Error(`${proxy.name}: HTTP ${resp.status}`);
+              // 5xx → retry once
+              if (resp.status >= 500 && attempt === 0) { await sleep(800); continue; }
+              break; // next proxy
             }
-            break; // move to next proxy
+
+            // Read body
+            let raw;
+            try { raw = await resp.text(); } catch (e) {
+              lastError = new Error(`${proxy.name}: не вдалося прочитати відповідь`);
+              break;
+            }
+
+            if (!raw || raw.length < 10) {
+              lastError = new Error(`${proxy.name}: порожня відповідь`);
+              break;
+            }
+
+            // HTML error page from proxy
+            if (raw.trimStart().startsWith('<!') || raw.trimStart().startsWith('<html')) {
+              lastError = new Error(`${proxy.name}: повернув HTML сторінку`);
+              break;
+            }
+
+            // Unwrap proxy envelope (e.g. allorigins wraps in {contents, status})
+            let bodyText;
+            try {
+              bodyText = proxy.unwrap(raw);
+            } catch (e) {
+              // allorigins threw httpCode error
+              if (e.httpCode && codeMap[e.httpCode]) {
+                return { ok: false, status: e.httpCode, msg: codeMap[e.httpCode] };
+              }
+              lastError = new Error(`${proxy.name}: unwrap failed — ${e.message}`);
+              break;
+            }
+
+            if (!bodyText || bodyText.trim() === '') {
+              lastError = new Error(`${proxy.name}: пусте тіло після unwrap`);
+              break;
+            }
+
+            // Parse JSON
+            let json;
+            try { json = JSON.parse(bodyText); } catch {
+              lastError = new Error(`${proxy.name}: невалідний JSON`);
+              break; // garbled — try next proxy
+            }
+
+            // Enka error retcode in body (sometimes HTTP 200 with error inside)
+            if (json?.retcode && json.retcode !== 0) {
+              const msg = codeMap[json.retcode] || `Помилка Enka (${json.retcode})`;
+              return { ok: false, status: json.retcode, msg };
+            }
+
+            if (!json?.playerInfo) {
+              lastError = new Error(`${proxy.name}: відповідь без playerInfo`);
+              break;
+            }
+
+            return { ok: true, data: json };
+
           } catch (e) {
-            lastError = e.name === 'AbortError'
-              ? new Error('Перевищено час очікування — спробуй ще раз')
-              : e;
-            if (attempt < attempts - 1) {
-              await new Promise(r => setTimeout(r, 600));
+            if (e.name === 'AbortError') {
+              lastError = new Error(`${proxy.name}: timeout`);
+            } else {
+              lastError = e;
             }
+            if (attempt === 0) await sleep(500);
           }
         }
       }
-      return { ok: false, msg: lastError?.message || 'Не вдалося підключитись до Enka.Network' };
+
+      return {
+        ok: false,
+        msg: `Не вдалося отримати дані. Перевір підключення до інтернету або спробуй пізніше.\n(${lastError?.message || 'невідома помилка'})`,
+      };
     }
+
+    function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
     // ── MAIN FETCH ──
     async function fetchPlayer() {
