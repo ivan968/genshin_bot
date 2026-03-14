@@ -1,0 +1,1066 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Genshin Stats</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --gold: #c8a96e;
+      --gold-light: #f0d49a;
+      --gold-dim: #7a6033;
+      --ink: #0d0e12;
+      --surface: #12141a;
+      --surface2: #191c26;
+      --surface3: #1f2332;
+      --border: rgba(200,169,110,0.2);
+      --border-bright: rgba(200,169,110,0.5);
+      --text: #e8dcc8;
+      --text-dim: #8a7d6a;
+      --pyro: #ff6b35;
+      --hydro: #4fc3f7;
+      --anemo: #80cbc4;
+      --electro: #ce93d8;
+      --dendro: #81c784;
+      --cryo: #b3e5fc;
+      --geo: #ffd54f;
+      --5star: #ffd700;
+      --4star: #9c6bcc;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+    body {
+      font-family: 'Crimson Pro', Georgia, serif;
+      background: var(--ink);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── BACKGROUND ── */
+    .bg-layer {
+      position: fixed; inset: 0; z-index: 0;
+      background:
+        radial-gradient(ellipse 80% 60% at 50% -10%, rgba(200,169,110,0.07) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 80% at 90% 50%, rgba(79,195,247,0.04) 0%, transparent 50%),
+        radial-gradient(ellipse 50% 70% at 10% 80%, rgba(206,147,216,0.04) 0%, transparent 50%);
+      pointer-events: none;
+    }
+    .bg-pattern {
+      position: fixed; inset: 0; z-index: 0;
+      background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' stroke='rgba(200,169,110,0.04)' stroke-width='0.5'%3E%3Cpolygon points='30,2 57,17 57,43 30,58 3,43 3,17'/%3E%3C/g%3E%3C/svg%3E");
+      pointer-events: none;
+    }
+
+    /* ── LAYOUT ── */
+    .app { position: relative; z-index: 1; max-width: 480px; margin: 0 auto; min-height: 100vh; }
+
+    /* ── HEADER ── */
+    header {
+      padding: 20px 20px 16px;
+      display: flex; align-items: center; gap: 14px;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(180deg, rgba(13,14,18,0.95) 0%, transparent 100%);
+      position: sticky; top: 0; z-index: 100;
+      backdrop-filter: blur(12px);
+    }
+    .logo {
+      width: 42px; height: 42px;
+      background: linear-gradient(135deg, var(--gold) 0%, var(--gold-light) 100%);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; flex-shrink: 0;
+      box-shadow: 0 0 20px rgba(200,169,110,0.4);
+    }
+    header h1 {
+      font-family: 'Cinzel', serif;
+      font-size: 17px; font-weight: 600;
+      letter-spacing: 0.05em;
+      color: var(--gold-light);
+      line-height: 1.2;
+    }
+    header p { font-size: 12px; color: var(--text-dim); margin-top: 1px; }
+
+    /* ── CONTENT ── */
+    .content { padding: 20px; }
+
+    /* ── UID INPUT ── */
+    .uid-section {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    .uid-section label {
+      display: block;
+      font-family: 'Cinzel', serif;
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      color: var(--gold);
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+    .uid-row { display: flex; gap: 10px; }
+    .uid-input {
+      flex: 1;
+      background: var(--surface3);
+      border: 1px solid var(--border-bright);
+      border-radius: 10px;
+      padding: 12px 16px;
+      color: var(--gold-light);
+      font-family: 'Crimson Pro', serif;
+      font-size: 18px;
+      letter-spacing: 0.05em;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .uid-input::placeholder { color: var(--text-dim); font-size: 14px; }
+    .uid-input:focus {
+      border-color: var(--gold);
+      box-shadow: 0 0 0 3px rgba(200,169,110,0.15);
+    }
+    .btn-search {
+      background: linear-gradient(135deg, var(--gold) 0%, #a8863c 100%);
+      border: none; border-radius: 10px;
+      padding: 12px 18px;
+      color: var(--ink);
+      font-family: 'Cinzel', serif;
+      font-size: 13px; font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s;
+      white-space: nowrap;
+      letter-spacing: 0.05em;
+    }
+    .btn-search:hover { transform: translateY(-1px); box-shadow: 0 4px 16px rgba(200,169,110,0.4); }
+    .btn-search:active { transform: translateY(0); }
+    .btn-search:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+    .uid-hint {
+      font-size: 12px; color: var(--text-dim);
+      margin-top: 10px; line-height: 1.5;
+    }
+    .uid-hint b { color: var(--gold-dim); font-weight: 600; }
+
+    /* ── STATES ── */
+    .state-box {
+      text-align: center; padding: 40px 20px;
+      display: none;
+    }
+    .state-box.visible { display: block; }
+    .spinner {
+      width: 40px; height: 40px;
+      border: 3px solid var(--border);
+      border-top-color: var(--gold);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 16px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .state-icon { font-size: 36px; margin-bottom: 12px; }
+    .state-title { font-family: 'Cinzel', serif; font-size: 16px; color: var(--gold); margin-bottom: 6px; }
+    .state-msg { font-size: 14px; color: var(--text-dim); line-height: 1.5; max-width: 280px; margin: 0 auto; }
+
+    /* ── PLAYER CARD ── */
+    .player-card {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 20px;
+      display: none;
+      animation: fadeUp 0.4s ease;
+    }
+    .player-card.visible { display: block; }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .player-header {
+      display: flex; gap: 14px; align-items: flex-start;
+      margin-bottom: 16px;
+    }
+    .player-avatar {
+      width: 60px; height: 60px; border-radius: 50%;
+      border: 2px solid var(--gold);
+      background: var(--surface3);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 28px; flex-shrink: 0;
+      overflow: hidden;
+    }
+    .player-avatar img { width: 100%; height: 100%; object-fit: cover; }
+    .player-info { flex: 1; min-width: 0; }
+    .player-name {
+      font-family: 'Cinzel', serif; font-size: 18px; font-weight: 600;
+      color: var(--gold-light);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .player-uid { font-size: 13px; color: var(--text-dim); margin: 2px 0 6px; }
+    .player-sig {
+      font-size: 13px; color: var(--text); font-style: italic;
+      opacity: 0.8; line-height: 1.4;
+    }
+
+    .stats-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+    .stat-item {
+      background: var(--surface3);
+      border-radius: 10px; padding: 10px 8px;
+      text-align: center;
+    }
+    .stat-val {
+      font-family: 'Cinzel', serif; font-size: 18px;
+      font-weight: 700; color: var(--gold-light);
+      display: block;
+    }
+    .stat-lbl { font-size: 10px; color: var(--text-dim); margin-top: 2px; letter-spacing: 0.05em; }
+
+    /* ── SECTION TITLE ── */
+    .section-title {
+      font-family: 'Cinzel', serif;
+      font-size: 12px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin: 20px 0 12px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .section-title::after {
+      content: ''; flex: 1;
+      height: 1px; background: var(--border);
+    }
+
+    /* ── CHARACTER CARDS ── */
+    .chars-list { display: flex; flex-direction: column; gap: 12px; display: none; }
+    .chars-list.visible { display: flex; }
+
+    .char-card {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+      animation: fadeUp 0.4s ease both;
+    }
+    .char-header {
+      display: flex; align-items: center; gap: 14px;
+      padding: 14px 16px; cursor: pointer;
+      position: relative;
+    }
+    .char-avatar {
+      width: 56px; height: 56px;
+      border-radius: 12px;
+      background: var(--surface3);
+      overflow: hidden; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 26px;
+      border: 2px solid transparent;
+      transition: border-color 0.2s;
+    }
+    .char-avatar img { width: 100%; height: 100%; object-fit: cover; }
+    .rarity-5 .char-avatar { border-color: rgba(255,215,0,0.5); }
+    .rarity-4 .char-avatar { border-color: rgba(156,107,204,0.5); }
+
+    .char-meta { flex: 1; min-width: 0; }
+    .char-name {
+      font-family: 'Cinzel', serif; font-size: 15px; font-weight: 600;
+      color: var(--text); line-height: 1.2; margin-bottom: 4px;
+    }
+    .char-sub { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .char-level {
+      font-size: 12px; color: var(--text-dim);
+    }
+    .char-element {
+      width: 18px; height: 18px; border-radius: 50%;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 10px;
+    }
+    .constellation-badge {
+      background: rgba(200,169,110,0.15);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      font-size: 11px; padding: 1px 7px;
+      color: var(--gold-dim);
+      font-family: 'Cinzel', serif;
+    }
+    .rarity-stars {
+      font-size: 11px;
+    }
+    .rarity-5 .rarity-stars { color: var(--5star); }
+    .rarity-4 .rarity-stars { color: var(--4star); }
+
+    .expand-arrow {
+      color: var(--text-dim); font-size: 14px;
+      transition: transform 0.25s;
+      flex-shrink: 0;
+    }
+    .char-card.open .expand-arrow { transform: rotate(180deg); }
+
+    /* ── CHAR DETAILS ── */
+    .char-details {
+      display: none; padding: 0 16px 14px;
+      border-top: 1px solid var(--border);
+      padding-top: 14px;
+    }
+    .char-card.open .char-details { display: block; }
+
+    .detail-block { margin-bottom: 12px; }
+    .detail-label {
+      font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase;
+      color: var(--gold); margin-bottom: 6px;
+      font-family: 'Cinzel', serif;
+    }
+
+    /* Weapon */
+    .weapon-row {
+      display: flex; align-items: center; gap: 10px;
+      background: var(--surface3); border-radius: 10px; padding: 10px 12px;
+    }
+    .weapon-icon {
+      width: 40px; height: 40px; border-radius: 8px;
+      background: var(--surface2);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; flex-shrink: 0;
+      overflow: hidden;
+    }
+    .weapon-icon img { width: 100%; height: 100%; object-fit: contain; }
+    .weapon-name { font-size: 14px; font-weight: 600; color: var(--text); }
+    .weapon-meta { font-size: 12px; color: var(--text-dim); }
+
+    /* Artifacts */
+    .artifacts-grid {
+      display: grid; grid-template-columns: repeat(5, 1fr);
+      gap: 6px;
+    }
+    .artifact-slot {
+      background: var(--surface3); border-radius: 8px; padding: 6px;
+      display: flex; flex-direction: column; align-items: center; gap: 3px;
+      min-height: 64px; justify-content: center;
+    }
+    .artifact-slot.empty { opacity: 0.3; }
+    .artifact-icon { font-size: 20px; }
+    .artifact-icon img { width: 30px; height: 30px; object-fit: contain; }
+    .artifact-name { font-size: 8px; color: var(--text-dim); text-align: center; line-height: 1.2; }
+
+    /* Fight Props */
+    .props-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 6px;
+    }
+    .prop-item {
+      background: var(--surface3); border-radius: 8px;
+      padding: 7px 10px; display: flex; justify-content: space-between;
+      align-items: center;
+    }
+    .prop-name { font-size: 11px; color: var(--text-dim); }
+    .prop-val { font-size: 13px; color: var(--gold-light); font-weight: 600;
+      font-family: 'Cinzel', serif; }
+
+    /* ── WISH SECTION ── */
+    .wish-note {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px;
+      margin-bottom: 20px;
+      display: none;
+      animation: fadeUp 0.4s ease;
+    }
+    .wish-note.visible { display: block; }
+    .wish-note-title {
+      font-family: 'Cinzel', serif; font-size: 13px;
+      color: var(--gold); margin-bottom: 8px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .wish-note p { font-size: 13px; color: var(--text-dim); line-height: 1.6; }
+    .wish-note a {
+      color: var(--gold); text-decoration: none;
+      border-bottom: 1px solid var(--border-bright);
+    }
+
+    /* ── BOTTOM SAFE AREA ── */
+    .bottom-pad { height: 30px; }
+
+    /* ── ELEMENT COLORS ── */
+    .el-pyro { background: rgba(255,107,53,0.2); color: var(--pyro); }
+    .el-hydro { background: rgba(79,195,247,0.2); color: var(--hydro); }
+    .el-anemo { background: rgba(128,203,196,0.2); color: var(--anemo); }
+    .el-electro { background: rgba(206,147,216,0.2); color: var(--electro); }
+    .el-dendro { background: rgba(129,199,132,0.2); color: var(--dendro); }
+    .el-cryo { background: rgba(179,229,252,0.2); color: var(--cryo); }
+    .el-geo { background: rgba(255,213,79,0.2); color: var(--geo); }
+
+    .no-chars {
+      text-align: center; padding: 30px;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 14px; margin-bottom: 16px; display: none;
+    }
+    .no-chars.visible { display: block; }
+    .no-chars p { font-size: 13px; color: var(--text-dim); line-height: 1.6; }
+
+    /* ── TOAST ── */
+    .toast {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px);
+      background: var(--surface2); border: 1px solid var(--border-bright);
+      border-radius: 10px; padding: 10px 18px;
+      font-size: 13px; color: var(--text);
+      opacity: 0; transition: all 0.3s; z-index: 999;
+      white-space: nowrap; pointer-events: none;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  </style>
+</head>
+<body>
+  <div class="bg-layer"></div>
+  <div class="bg-pattern"></div>
+
+  <div class="app">
+    <header>
+      <div class="logo">✦</div>
+      <div>
+        <h1>Genshin Stats</h1>
+        <p>Пошук по UID · Enka.Network</p>
+      </div>
+    </header>
+
+    <div class="content">
+      <!-- UID Input -->
+      <div class="uid-section">
+        <label>Введи свій UID</label>
+        <div class="uid-row">
+          <input
+            class="uid-input"
+            id="uidInput"
+            type="number"
+            placeholder="Наприклад: 825436941"
+            maxlength="10"
+          />
+          <button class="btn-search" id="searchBtn" onclick="fetchPlayer()">Шукати</button>
+        </div>
+        <p class="uid-hint">
+          UID знаходиться <b>знизу праворуч</b> екрана в грі.<br>
+          Персонажі мають бути у <b>вітрині (showcase)</b>.
+        </p>
+      </div>
+
+      <!-- Loading -->
+      <div class="state-box" id="loadingBox">
+        <div class="spinner"></div>
+        <div class="state-title">Завантаження...</div>
+        <div class="state-msg">Отримуємо дані з Enka.Network</div>
+      </div>
+
+      <!-- Error -->
+      <div class="state-box" id="errorBox">
+        <div class="state-icon">⚠️</div>
+        <div class="state-title">Помилка</div>
+        <div class="state-msg" id="errorMsg">Щось пішло не так</div>
+      </div>
+
+      <!-- Player Card -->
+      <div class="player-card" id="playerCard">
+        <div class="player-header">
+          <div class="player-avatar" id="playerAvatar">🌸</div>
+          <div class="player-info">
+            <div class="player-name" id="playerName">—</div>
+            <div class="player-uid" id="playerUidText">UID: —</div>
+            <div class="player-sig" id="playerSig"></div>
+          </div>
+        </div>
+        <div class="stats-grid">
+          <div class="stat-item">
+            <span class="stat-val" id="statAdv">—</span>
+            <div class="stat-lbl">⚔ Рівень AR</div>
+          </div>
+          <div class="stat-item">
+            <span class="stat-val" id="statWorld">—</span>
+            <div class="stat-lbl">🌍 Світ</div>
+          </div>
+          <div class="stat-item">
+            <span class="stat-val" id="statAchiev">—</span>
+            <div class="stat-lbl">🏆 Досягн.</div>
+          </div>
+          <div class="stat-item">
+            <span class="stat-val" id="statAbyss">—</span>
+            <div class="stat-lbl">🌀 Безодня</div>
+          </div>
+          <div class="stat-item">
+            <span class="stat-val" id="statTheater">—</span>
+            <div class="stat-lbl">🎭 Театр</div>
+          </div>
+          <div class="stat-item">
+            <span class="stat-val" id="statChars">—</span>
+            <div class="stat-lbl">👥 Вітрина</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Wish note -->
+      <div class="wish-note" id="wishNote">
+        <div class="wish-note-title">💫 Статистика круток</div>
+        <p>
+          Для перегляду детальної статистики круток (pity, кількість pulls, розподіл 5★) використовуй
+          <a href="https://paimon.moe/wish" target="_blank">paimon.moe/wish</a> — найкращий трекер.
+          Ці дані не доступні публічно через API.
+        </p>
+      </div>
+
+      <!-- Characters -->
+      <div id="charsSection" style="display:none">
+        <div class="section-title">Вітрина персонажів</div>
+        <div class="chars-list" id="charsList"></div>
+      </div>
+
+      <div class="no-chars" id="noChars">
+        <p>🎭 Вітрина порожня або закрита.<br>Додай персонажів у вітрину в меню гри.</p>
+      </div>
+
+      <div class="bottom-pad"></div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    // Init Telegram WebApp
+    const tg = window.Telegram?.WebApp;
+    if (tg) {
+      tg.ready();
+      tg.expand();
+      tg.setHeaderColor('#0d0e12');
+      tg.setBackgroundColor('#0d0e12');
+    }
+
+    // ── DATA MAPS ──
+    const ELEMENT_MAP = {
+      Fire: { name: 'Pyro', emoji: '🔥', cls: 'el-pyro' },
+      Water: { name: 'Hydro', emoji: '💧', cls: 'el-hydro' },
+      Wind: { name: 'Anemo', emoji: '🍃', cls: 'el-anemo' },
+      Electric: { name: 'Electro', emoji: '⚡', cls: 'el-electro' },
+      Grass: { name: 'Dendro', emoji: '🌿', cls: 'el-dendro' },
+      Ice: { name: 'Cryo', emoji: '❄️', cls: 'el-cryo' },
+      Rock: { name: 'Geo', emoji: '🪨', cls: 'el-geo' },
+    };
+
+    const FIGHT_PROP = {
+      '2000': ['HP', '♥'],
+      '2001': ['ATK', '⚔'],
+      '2002': ['DEF', '🛡'],
+      '20':   ['CRIT Rate', '🎯', '%'],
+      '22':   ['CRIT DMG', '💥', '%'],
+      '28':   ['Elemental Mastery', '✨'],
+      '23':   ['Energy Recharge', '⚡', '%'],
+    };
+
+    const ARTIFACT_SLOT = ['Flower', 'Plume', 'Sands', 'Goblet', 'Circlet'];
+    const ARTIFACT_EMOJI = ['🌸', '🪶', '⏳', '🏺', '👑'];
+    const EQUIP_TYPE_MAP = {
+      EQUIP_BRACER: 0, EQUIP_NECKLACE: 1,
+      EQUIP_SHOES: 2, EQUIP_RING: 3, EQUIP_DRESS: 4,
+    };
+
+    // ── PROXY (CORS workaround for enka.network) ──
+    const ENKA_BASE = 'https://enka.network';
+    const CORS_PROXY = 'https://api.allorigins.win/raw?url=';
+    const ICON_BASE = 'https://enka.network/ui/';
+
+    let characterData = {};
+    let weaponData = {};
+
+    // ── FETCH CHARACTER/WEAPON NAMES from enka store ──
+    async function loadGameData() {
+      try {
+        const resp = await fetch(`${CORS_PROXY}${encodeURIComponent('https://enka.network/api/hash-map.json')}`);
+        // Not critical, skip if fails
+      } catch {}
+    }
+
+    // ── MAIN FETCH ──
+    async function fetchPlayer() {
+      const uid = document.getElementById('uidInput').value.trim();
+      if (!uid || uid.length < 6 || uid.length > 10) {
+        showToast('Введи правильний UID (9 цифр)');
+        return;
+      }
+
+      setState('loading');
+      const btn = document.getElementById('searchBtn');
+      btn.disabled = true;
+
+      try {
+        const url = `${ENKA_BASE}/api/uid/${uid}/`;
+        const proxyUrl = `${CORS_PROXY}${encodeURIComponent(url)}`;
+        const resp = await fetch(proxyUrl);
+
+        if (!resp.ok) {
+          if (resp.status === 400) throw new Error('Неправильний UID');
+          if (resp.status === 404) throw new Error('Гравець не знайдений');
+          if (resp.status === 429) throw new Error('Забагато запитів, спробуй пізніше');
+          if (resp.status === 424) throw new Error('Сервер Genshin недоступний, спробуй пізніше');
+          throw new Error(`Помилка сервера (${resp.status})`);
+        }
+
+        const data = await resp.json();
+        renderPlayer(data, uid);
+      } catch (e) {
+        setState('error', e.message || 'Не вдалося завантажити дані');
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    // ── RENDER PLAYER ──
+    function renderPlayer(data, uid) {
+      const pi = data.playerInfo;
+
+      // Avatar
+      const avatarEl = document.getElementById('playerAvatar');
+      if (pi.profilePicture?.avatarId) {
+        avatarEl.textContent = '🧑';
+      } else {
+        avatarEl.textContent = '🌸';
+      }
+
+      document.getElementById('playerName').textContent = pi.nickname || 'Невідомо';
+      document.getElementById('playerUidText').textContent = `UID: ${uid}`;
+      document.getElementById('playerSig').textContent = pi.signature || '';
+
+      document.getElementById('statAdv').textContent = pi.level || '—';
+      document.getElementById('statWorld').textContent = pi.worldLevel ?? '—';
+      document.getElementById('statAchiev').textContent = pi.finishAchievementNum ?? '—';
+
+      const abyss = pi.towerFloorIndex
+        ? `${pi.towerFloorIndex}-${pi.towerLevelIndex}`
+        : '—';
+      document.getElementById('statAbyss').textContent = abyss;
+
+      const theater = pi.theaterStars ? `${pi.theaterStars}★` : '—';
+      document.getElementById('statTheater').textContent = theater;
+
+      const chars = data.avatarInfoList || [];
+      document.getElementById('statChars').textContent = chars.length;
+
+      setState('player');
+
+      // Characters
+      if (chars.length > 0) {
+        document.getElementById('charsSection').style.display = 'block';
+        document.getElementById('noChars').classList.remove('visible');
+        renderCharacters(chars, data);
+        document.getElementById('charsList').classList.add('visible');
+      } else {
+        document.getElementById('charsSection').style.display = 'none';
+        document.getElementById('noChars').classList.add('visible');
+      }
+
+      document.getElementById('wishNote').classList.add('visible');
+    }
+
+    // ── RENDER CHARACTERS ──
+    function renderCharacters(chars, data) {
+      const list = document.getElementById('charsList');
+      list.innerHTML = '';
+
+      chars.forEach((char, i) => {
+        const card = buildCharCard(char, i);
+        list.appendChild(card);
+      });
+    }
+
+    function buildCharCard(char, idx) {
+      const charId = char.avatarId;
+      const level = char.propMap?.['4001']?.val || '?';
+      const constell = (char.talentIdList || []).length;
+      const fp = char.fightPropMap || {};
+      const rarity = guessRarity(charId);
+
+      // Get element from element prop
+      const elementId = char.skillDepotId;
+      const elementInfo = getElementInfo(char);
+
+      const card = document.createElement('div');
+      card.className = `char-card rarity-${rarity}`;
+      card.style.animationDelay = `${idx * 0.06}s`;
+
+      const charName = getCharName(charId);
+      const iconUrl = getCharIcon(charId);
+      const stars = '★'.repeat(rarity);
+
+      card.innerHTML = `
+        <div class="char-header" onclick="toggleCard(this)">
+          <div class="char-avatar">
+            ${iconUrl
+              ? `<img src="${iconUrl}" onerror="this.parentNode.textContent='🧍'" alt="${charName}" />`
+              : '<span>🧍</span>'
+            }
+          </div>
+          <div class="char-meta">
+            <div class="char-name">${charName}</div>
+            <div class="char-sub">
+              <span class="rarity-stars">${stars}</span>
+              ${elementInfo
+                ? `<span class="char-element ${elementInfo.cls}" title="${elementInfo.name}">${elementInfo.emoji}</span>`
+                : ''
+              }
+              <span class="char-level">Рівень ${level}</span>
+              <span class="constellation-badge">C${constell}</span>
+            </div>
+          </div>
+          <span class="expand-arrow">▾</span>
+        </div>
+        <div class="char-details">
+          ${buildWeaponSection(char)}
+          ${buildArtifactsSection(char)}
+          ${buildStatsSection(fp)}
+        </div>
+      `;
+
+      return card;
+    }
+
+    function buildWeaponSection(char) {
+      const equip = char.equipList || [];
+      const weapon = equip.find(e => e.flat?.itemType === 'ITEM_WEAPON');
+      if (!weapon) return '';
+
+      const name = weapon.flat?.nameTextMapHash || 'Зброя';
+      const level = weapon.weapon?.level || 1;
+      const refine = weapon.weapon?.affixMap ? Object.values(weapon.weapon.affixMap)[0] + 1 : 1;
+      const iconKey = weapon.flat?.icon;
+      const iconUrl = iconKey ? `${ICON_BASE}${iconKey}.png` : null;
+      const displayName = getWeaponName(weapon.itemId, iconKey);
+
+      return `
+        <div class="detail-block">
+          <div class="detail-label">⚔ Зброя</div>
+          <div class="weapon-row">
+            <div class="weapon-icon">
+              ${iconUrl
+                ? `<img src="${iconUrl}" onerror="this.parentNode.textContent='⚔'" alt="weapon" />`
+                : '⚔'
+              }
+            </div>
+            <div>
+              <div class="weapon-name">${displayName}</div>
+              <div class="weapon-meta">Рівень ${level} · R${refine}</div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function buildArtifactsSection(char) {
+      const equip = char.equipList || [];
+      const artifacts = equip.filter(e => e.flat?.itemType === 'ITEM_RELIQUARY');
+
+      if (artifacts.length === 0) return '';
+
+      const slots = [null, null, null, null, null];
+      artifacts.forEach(a => {
+        const idx = EQUIP_TYPE_MAP[a.flat?.equipType];
+        if (idx !== undefined) slots[idx] = a;
+      });
+
+      const slotsHtml = slots.map((art, i) => {
+        if (!art) {
+          return `<div class="artifact-slot empty">
+            <div class="artifact-icon">${ARTIFACT_EMOJI[i]}</div>
+            <div class="artifact-name">${ARTIFACT_SLOT[i]}</div>
+          </div>`;
+        }
+        const iconKey = art.flat?.icon;
+        const iconUrl = iconKey ? `${ICON_BASE}${iconKey}.png` : null;
+        const setName = art.flat?.setNameTextMapHash || '';
+        const mainStat = art.flat?.reliquaryMainstat?.mainPropId || '';
+        const mainStatShort = formatStatName(mainStat);
+
+        return `<div class="artifact-slot" title="${ARTIFACT_SLOT[i]}">
+          ${iconUrl
+            ? `<div class="artifact-icon"><img src="${iconUrl}" onerror="this.textContent='${ARTIFACT_EMOJI[i]}'" alt="${ARTIFACT_SLOT[i]}" /></div>`
+            : `<div class="artifact-icon">${ARTIFACT_EMOJI[i]}</div>`
+          }
+          <div class="artifact-name">${mainStatShort}</div>
+        </div>`;
+      }).join('');
+
+      return `
+        <div class="detail-block">
+          <div class="detail-label">🏺 Артефакти</div>
+          <div class="artifacts-grid">${slotsHtml}</div>
+        </div>
+      `;
+    }
+
+    function buildStatsSection(fp) {
+      const showProps = ['2000','2001','2002','20','22','28','23'];
+      const items = showProps.map(id => {
+        const info = FIGHT_PROP[id];
+        if (!info) return '';
+        const raw = fp[id] || 0;
+        const isPercent = info[2] === '%';
+        const val = isPercent
+          ? (raw * 100).toFixed(1) + '%'
+          : Math.round(raw).toLocaleString();
+        return `<div class="prop-item">
+          <span class="prop-name">${info[1]} ${info[0]}</span>
+          <span class="prop-val">${val}</span>
+        </div>`;
+      }).join('');
+
+      return `
+        <div class="detail-block">
+          <div class="detail-label">📊 Статистика</div>
+          <div class="props-grid">${items}</div>
+        </div>
+      `;
+    }
+
+    // ── HELPERS ──
+    function toggleCard(header) {
+      const card = header.closest('.char-card');
+      card.classList.toggle('open');
+    }
+
+    function getCharIcon(avatarId) {
+      // Map known IDs to enka icon names
+      const knownIcons = {
+        10000002: 'UI_AvatarIcon_Ayaka',
+        10000003: 'UI_AvatarIcon_Qin',
+        10000004: 'UI_AvatarIcon_Barbara',
+        10000005: 'UI_AvatarIcon_Playerboy',
+        10000006: 'UI_AvatarIcon_Lisa',
+        10000007: 'UI_AvatarIcon_Playergirl',
+        10000014: 'UI_AvatarIcon_Venti',
+        10000015: 'UI_AvatarIcon_Kaeya',
+        10000016: 'UI_AvatarIcon_Diluc',
+        10000020: 'UI_AvatarIcon_Razor',
+        10000021: 'UI_AvatarIcon_Ambor',
+        10000022: 'UI_AvatarIcon_Loli',
+        10000023: 'UI_AvatarIcon_Noel',
+        10000024: 'UI_AvatarIcon_Bennett',
+        10000025: 'UI_AvatarIcon_Fischl',
+        10000026: 'UI_AvatarIcon_Guoba',
+        10000027: 'UI_AvatarIcon_Xiangling',
+        10000029: 'UI_AvatarIcon_Beidou',
+        10000030: 'UI_AvatarIcon_Xingqiu',
+        10000031: 'UI_AvatarIcon_Xiao',
+        10000032: 'UI_AvatarIcon_Ningguang',
+        10000033: 'UI_AvatarIcon_Klee',
+        10000034: 'UI_AvatarIcon_Zhongli',
+        10000035: 'UI_AvatarIcon_Sucrose',
+        10000036: 'UI_AvatarIcon_Albedo',
+        10000037: 'UI_AvatarIcon_Diona',
+        10000038: 'UI_AvatarIcon_Mona',
+        10000039: 'UI_AvatarIcon_Keqing',
+        10000041: 'UI_AvatarIcon_Ganyu',
+        10000042: 'UI_AvatarIcon_Hutao',
+        10000043: 'UI_AvatarIcon_Kazuha',
+        10000044: 'UI_AvatarIcon_Feiyan',
+        10000045: 'UI_AvatarIcon_Yoimiya',
+        10000046: 'UI_AvatarIcon_Tohma',
+        10000047: 'UI_AvatarIcon_Xinyan',
+        10000048: 'UI_AvatarIcon_Rosaria',
+        10000049: 'UI_AvatarIcon_Chongyun',
+        10000050: 'UI_AvatarIcon_Gorou',
+        10000051: 'UI_AvatarIcon_Sara',
+        10000052: 'UI_AvatarIcon_Ei',
+        10000053: 'UI_AvatarIcon_Sayu',
+        10000054: 'UI_AvatarIcon_Eula',
+        10000055: 'UI_AvatarIcon_Shougun',
+        10000056: 'UI_AvatarIcon_Thoma',
+        10000058: 'UI_AvatarIcon_Aloy',
+        10000059: 'UI_AvatarIcon_Shenhe',
+        10000060: 'UI_AvatarIcon_Yunjin',
+        10000061: 'UI_AvatarIcon_Kokomi',
+        10000062: 'UI_AvatarIcon_Qiqi',
+        10000063: 'UI_AvatarIcon_Heizo',
+        10000064: 'UI_AvatarIcon_Yelan',
+        10000065: 'UI_AvatarIcon_Shinobu',
+        10000066: 'UI_AvatarIcon_Itto',
+        10000067: 'UI_AvatarIcon_Yae',
+        10000069: 'UI_AvatarIcon_Nilou',
+        10000070: 'UI_AvatarIcon_Cyno',
+        10000071: 'UI_AvatarIcon_Candace',
+        10000072: 'UI_AvatarIcon_Nahida',
+        10000073: 'UI_AvatarIcon_Layla',
+        10000074: 'UI_AvatarIcon_Wanderer',
+        10000075: 'UI_AvatarIcon_Faruzan',
+        10000076: 'UI_AvatarIcon_Yaoyao',
+        10000077: 'UI_AvatarIcon_Alhatham',
+        10000078: 'UI_AvatarIcon_Dehya',
+        10000079: 'UI_AvatarIcon_Mika',
+        10000080: 'UI_AvatarIcon_Kaveh',
+        10000081: 'UI_AvatarIcon_Baizhuer',
+        10000082: 'UI_AvatarIcon_Collei',
+        10000083: 'UI_AvatarIcon_Tighnari',
+        10000084: 'UI_AvatarIcon_Dori',
+        10000085: 'UI_AvatarIcon_Freminet',
+        10000086: 'UI_AvatarIcon_Lyney',
+        10000087: 'UI_AvatarIcon_Lynette',
+        10000088: 'UI_AvatarIcon_Furina',
+        10000089: 'UI_AvatarIcon_Charlotte',
+        10000090: 'UI_AvatarIcon_Navia',
+        10000091: 'UI_AvatarIcon_Chevreuse',
+        10000092: 'UI_AvatarIcon_Xianyun',
+        10000093: 'UI_AvatarIcon_Gaming',
+        10000094: 'UI_AvatarIcon_Chiori',
+        10000095: 'UI_AvatarIcon_Sigewinne',
+        10000096: 'UI_AvatarIcon_Arlecchino',
+        10000097: 'UI_AvatarIcon_Sethos',
+        10000098: 'UI_AvatarIcon_Clorinde',
+        10000099: 'UI_AvatarIcon_Emilie',
+        10000100: 'UI_AvatarIcon_Kachina',
+        10000101: 'UI_AvatarIcon_Kinich',
+        10000102: 'UI_AvatarIcon_Mualani',
+        10000103: 'UI_AvatarIcon_Xilonen',
+        10000104: 'UI_AvatarIcon_Chasca',
+        10000105: 'UI_AvatarIcon_Ororon',
+        10000106: 'UI_AvatarIcon_Mavuika',
+        10000107: 'UI_AvatarIcon_Citlali',
+        10000108: 'UI_AvatarIcon_Lan',
+        10000109: 'UI_AvatarIcon_Mizuki',
+        10000110: 'UI_AvatarIcon_Yumemizuki',
+      };
+      const iconName = knownIcons[avatarId];
+      return iconName ? `${ICON_BASE}${iconName}_Circle.png` : null;
+    }
+
+    function getCharName(avatarId) {
+      const names = {
+        10000002: 'Аяка', 10000003: 'Джинн', 10000004: 'Барбара',
+        10000005: 'Гравець (♂)', 10000006: 'Ліза', 10000007: 'Гравець (♀)',
+        10000014: 'Венті', 10000015: 'Кея', 10000016: 'Ділюк',
+        10000020: 'Різо', 10000021: 'Амбер', 10000022: 'Кіра',
+        10000023: 'Ноель', 10000024: 'Беннет', 10000025: 'Фішль',
+        10000026: 'Сяньлін (Пузир)', 10000027: 'Сяньлін', 10000029: 'Бейдоу',
+        10000030: 'Сінцю', 10000031: 'Сяо', 10000032: 'Нінгуан',
+        10000033: 'Клі', 10000034: 'Чжунлі', 10000035: 'Сукроз',
+        10000036: 'Альбедо', 10000037: 'Діона', 10000038: 'Мона',
+        10000039: 'Кецін', 10000041: 'Ганью', 10000042: 'Ху Тао',
+        10000043: 'Казуха', 10000044: 'Фейян', 10000045: 'Йоімія',
+        10000046: 'Тома', 10000047: 'Сіньян', 10000048: 'Розарія',
+        10000049: 'Чунюнь', 10000050: 'Горо', 10000051: 'Сара',
+        10000052: 'Ей (Ямата)', 10000053: 'Саю', 10000054: 'Ейла',
+        10000055: 'Сьоґун Рейдан', 10000056: 'Тома', 10000058: 'Елой',
+        10000059: 'Шенхе', 10000060: 'Юньцзінь', 10000061: 'Кокомі',
+        10000062: 'Ціці', 10000063: 'Хейдзо', 10000064: 'Єлань',
+        10000065: 'Кукі Сінобу', 10000066: 'Ітто', 10000067: 'Яе Міко',
+        10000069: 'Нілу', 10000070: 'Сіно', 10000071: 'Кандейс',
+        10000072: 'Нахіда', 10000073: 'Лайла', 10000074: 'Странник',
+        10000075: 'Фарузан', 10000076: 'Яояо', 10000077: 'Аль-Хайтам',
+        10000078: 'Дея', 10000079: 'Міка', 10000080: 'Кавех',
+        10000081: 'Байчжу', 10000082: 'Колей', 10000083: 'Тіґнарі',
+        10000084: 'Доррі', 10000085: 'Фремінет', 10000086: 'Ліне',
+        10000087: 'Лінетт', 10000088: 'Фуріна', 10000089: 'Шарлотта',
+        10000090: 'Навія', 10000091: 'Шеврез', 10000092: 'Сяньюнь',
+        10000093: 'Ґеймін', 10000094: 'Чіорі', 10000095: 'Сіґевінне',
+        10000096: 'Арлекіно', 10000097: 'Сетос', 10000098: 'Клорінд',
+        10000099: 'Еміль', 10000100: 'Качіна', 10000101: 'Кінік',
+        10000102: 'Муалані', 10000103: 'Кшілонен', 10000104: 'Часка',
+        10000105: 'Ороро', 10000106: 'Мавуїка', 10000107: 'Сітлалі',
+        10000108: 'Лан', 10000109: 'Мідзукі', 10000110: 'Юмемідзукі',
+      };
+      return names[avatarId] || `Персонаж #${avatarId}`;
+    }
+
+    function getWeaponName(itemId, iconKey) {
+      if (!iconKey) return `Зброя #${itemId}`;
+      // Extract from icon key e.g. UI_EquipIcon_Sword_Aquila → Aquila
+      const parts = iconKey.split('_');
+      return parts.slice(3).join(' ') || iconKey;
+    }
+
+    function getElementInfo(char) {
+      // Map skillDepotId ranges to elements
+      const id = char.skillDepotId;
+      const elementRanges = [
+        [501, 'Wind'], [701, 'Rock'], [901, 'Electric'],
+        [1101, 'Grass'], [1301, 'Water'], [1401, 'Ice'], [1501, 'Fire'],
+        [201, 'Wind'], // Lumine/Aether default
+      ];
+      // Use propMap element if available
+      const eprop = char.fightPropMap?.['50'];
+      const elementByProp = {
+        1: 'Fire', 2: 'Water', 3: 'Grass', 4: 'Electric',
+        5: 'Ice', 6: 'Wind', 7: 'Rock',
+      };
+      const elemKey = eprop ? elementByProp[Math.round(eprop)] : null;
+      const info = ELEMENT_MAP[elemKey];
+      return info || null;
+    }
+
+    function guessRarity(avatarId) {
+      const fiveStars = [
+        10000002,10000003,10000014,10000016,10000031,10000033,10000034,
+        10000038,10000039,10000041,10000042,10000043,10000052,10000054,
+        10000055,10000058,10000059,10000061,10000064,10000066,10000067,
+        10000069,10000070,10000072,10000074,10000077,10000081,10000083,
+        10000086,10000088,10000090,10000092,10000094,10000095,10000096,
+        10000098,10000099,10000101,10000102,10000103,10000104,10000106,
+        10000107,10000109,10000110,
+      ];
+      return fiveStars.includes(avatarId) ? 5 : 4;
+    }
+
+    function formatStatName(propId) {
+      const map = {
+        FIGHT_PROP_HP: 'HP',
+        FIGHT_PROP_ATTACK: 'ATK',
+        FIGHT_PROP_HP_PERCENT: 'HP%',
+        FIGHT_PROP_ATTACK_PERCENT: 'ATK%',
+        FIGHT_PROP_DEFENSE_PERCENT: 'DEF%',
+        FIGHT_PROP_ELEMENT_MASTERY: 'EM',
+        FIGHT_PROP_CHARGE_EFFICIENCY: 'ER%',
+        FIGHT_PROP_CRITICAL: 'CR%',
+        FIGHT_PROP_CRITICAL_HURT: 'CD%',
+        FIGHT_PROP_FIRE_ADD_HURT: 'Pyro%',
+        FIGHT_PROP_WATER_ADD_HURT: 'Hydro%',
+        FIGHT_PROP_WIND_ADD_HURT: 'Anemo%',
+        FIGHT_PROP_ELEC_ADD_HURT: 'Electro%',
+        FIGHT_PROP_GRASS_ADD_HURT: 'Dendro%',
+        FIGHT_PROP_ICE_ADD_HURT: 'Cryo%',
+        FIGHT_PROP_ROCK_ADD_HURT: 'Geo%',
+        FIGHT_PROP_PHYSICAL_ADD_HURT: 'Phys%',
+        FIGHT_PROP_HEAL_ADD: 'Heal%',
+      };
+      return map[propId] || propId?.replace('FIGHT_PROP_', '').replace(/_/g, ' ') || '?';
+    }
+
+    // ── UI STATE ──
+    function setState(state, msg) {
+      document.getElementById('loadingBox').classList.toggle('visible', state === 'loading');
+      document.getElementById('errorBox').classList.toggle('visible', state === 'error');
+      document.getElementById('playerCard').classList.toggle('visible', state === 'player');
+
+      if (state === 'error') {
+        document.getElementById('errorMsg').textContent = msg || 'Невідома помилка';
+        document.getElementById('charsSection').style.display = 'none';
+        document.getElementById('charsList').classList.remove('visible');
+        document.getElementById('noChars').classList.remove('visible');
+        document.getElementById('wishNote').classList.remove('visible');
+      }
+    }
+
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 2800);
+    }
+
+    // ── KEYBOARD ──
+    document.getElementById('uidInput').addEventListener('keydown', e => {
+      if (e.key === 'Enter') fetchPlayer();
+    });
+
+    // ── INIT ──
+    if (tg?.initDataUnsafe?.user) {
+      showToast(`Привіт, ${tg.initDataUnsafe.user.first_name}! 👋`);
+    }
+  </script>
+</body>
+</html>
