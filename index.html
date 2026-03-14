@@ -435,7 +435,9 @@
           <input
             class="uid-input"
             id="uidInput"
-            type="number"
+            type="text"
+            inputmode="numeric"
+            pattern="[0-9]*"
             placeholder="Наприклад: 825436941"
             maxlength="10"
           />
@@ -451,7 +453,7 @@
       <div class="state-box" id="loadingBox">
         <div class="spinner"></div>
         <div class="state-title">Завантаження...</div>
-        <div class="state-msg">Отримуємо дані з Enka.Network</div>
+        <div class="state-msg" id="loadingMsg">Отримуємо дані з Enka.Network</div>
       </div>
 
       <!-- Error -->
@@ -565,25 +567,87 @@
 
     // ── PROXY (CORS workaround for enka.network) ──
     const ENKA_BASE = 'https://enka.network';
-    const CORS_PROXY = 'https://api.allorigins.win/raw?url=';
     const ICON_BASE = 'https://enka.network/ui/';
+
+    // Multiple proxies tried in order — if one fails or gives server error, next is used
+    const PROXIES = [
+      url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+      url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+      url => `https://proxy.cors.sh/${url}`,
+    ];
 
     let characterData = {};
     let weaponData = {};
 
-    // ── FETCH CHARACTER/WEAPON NAMES from enka store ──
-    async function loadGameData() {
-      try {
-        const resp = await fetch(`${CORS_PROXY}${encodeURIComponent('https://enka.network/api/hash-map.json')}`);
-        // Not critical, skip if fails
-      } catch {}
+    // ── ROBUST FETCH with retry across proxies ──
+    async function fetchWithRetry(targetUrl, attempts = 3) {
+      const proxyNames = ['AllOrigins', 'CorsProxy.io', 'cors.sh'];
+      let lastError;
+      for (let i = 0; i < PROXIES.length; i++) {
+        const proxyUrl = PROXIES[i](targetUrl);
+        if (i > 0) {
+          const msgEl = document.getElementById('loadingMsg');
+          if (msgEl) msgEl.textContent = `Спроба через резервний сервер (${proxyNames[i]})…`;
+        }
+        for (let attempt = 0; attempt < attempts; attempt++) {
+          try {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 10000); // 10s timeout
+            const resp = await fetch(proxyUrl, { signal: controller.signal });
+            clearTimeout(timeout);
+
+            // Some proxies return 200 with an error body — parse and verify
+            if (resp.status === 200) {
+              const text = await resp.text();
+              // Check for empty or proxy error responses
+              if (!text || text.trim() === '' || text.includes('Error') && text.length < 100) {
+                lastError = new Error('Порожня відповідь від проксі');
+                break; // try next proxy
+              }
+              let json;
+              try { json = JSON.parse(text); } catch {
+                lastError = new Error('Невалідна відповідь');
+                break;
+              }
+              // Enka error codes in body
+              if (json?.uid && !json?.playerInfo) {
+                lastError = new Error('Дані недоступні (гравець офлайн?)');
+                break;
+              }
+              return { ok: true, data: json };
+            }
+
+            // Map known HTTP status codes
+            if (resp.status === 400) return { ok: false, status: 400, msg: 'Неправильний UID' };
+            if (resp.status === 404) return { ok: false, status: 404, msg: 'Гравець не знайдений або профіль закритий' };
+            if (resp.status === 429) return { ok: false, status: 429, msg: 'Забагато запитів — зачекай ~10 секунд і спробуй ще раз' };
+            if (resp.status === 424) return { ok: false, status: 424, msg: 'Сервер Genshin тимчасово недоступний, спробуй пізніше' };
+
+            lastError = new Error(`Помилка проксі (HTTP ${resp.status})`);
+            // For 5xx — retry same proxy
+            if (resp.status >= 500 && attempt < attempts - 1) {
+              await new Promise(r => setTimeout(r, 800 * (attempt + 1)));
+              continue;
+            }
+            break; // move to next proxy
+          } catch (e) {
+            lastError = e.name === 'AbortError'
+              ? new Error('Перевищено час очікування — спробуй ще раз')
+              : e;
+            if (attempt < attempts - 1) {
+              await new Promise(r => setTimeout(r, 600));
+            }
+          }
+        }
+      }
+      return { ok: false, msg: lastError?.message || 'Не вдалося підключитись до Enka.Network' };
     }
 
     // ── MAIN FETCH ──
     async function fetchPlayer() {
-      const uid = document.getElementById('uidInput').value.trim();
-      if (!uid || uid.length < 6 || uid.length > 10) {
-        showToast('Введи правильний UID (9 цифр)');
+      const uid = document.getElementById('uidInput').value.trim().replace(/\D/g, '');
+      if (!uid || uid.length !== 9) {
+        showToast('UID має бути рівно 9 цифр');
         return;
       }
 
@@ -592,20 +656,14 @@
       btn.disabled = true;
 
       try {
-        const url = `${ENKA_BASE}/api/uid/${uid}/`;
-        const proxyUrl = `${CORS_PROXY}${encodeURIComponent(url)}`;
-        const resp = await fetch(proxyUrl);
+        const result = await fetchWithRetry(`${ENKA_BASE}/api/uid/${uid}/`);
 
-        if (!resp.ok) {
-          if (resp.status === 400) throw new Error('Неправильний UID');
-          if (resp.status === 404) throw new Error('Гравець не знайдений');
-          if (resp.status === 429) throw new Error('Забагато запитів, спробуй пізніше');
-          if (resp.status === 424) throw new Error('Сервер Genshin недоступний, спробуй пізніше');
-          throw new Error(`Помилка сервера (${resp.status})`);
+        if (!result.ok) {
+          setState('error', result.msg || 'Не вдалося завантажити дані');
+          return;
         }
 
-        const data = await resp.json();
-        renderPlayer(data, uid);
+        renderPlayer(result.data, uid);
       } catch (e) {
         setState('error', e.message || 'Не вдалося завантажити дані');
       } finally {
@@ -617,10 +675,16 @@
     function renderPlayer(data, uid) {
       const pi = data.playerInfo;
 
-      // Avatar
+      // Avatar — use actual character icon if available
       const avatarEl = document.getElementById('playerAvatar');
-      if (pi.profilePicture?.avatarId) {
-        avatarEl.textContent = '🧑';
+      const avatarCharId = pi.profilePicture?.avatarId;
+      if (avatarCharId) {
+        const avatarIconUrl = getCharIcon(avatarCharId);
+        if (avatarIconUrl) {
+          avatarEl.innerHTML = `<img src="${avatarIconUrl}" onerror="this.parentNode.textContent='🧑'" alt="avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />`;
+        } else {
+          avatarEl.textContent = '🧑';
+        }
       } else {
         avatarEl.textContent = '🌸';
       }
@@ -678,8 +742,7 @@
       const fp = char.fightPropMap || {};
       const rarity = guessRarity(charId);
 
-      // Get element from element prop
-      const elementId = char.skillDepotId;
+      // Get element info
       const elementInfo = getElementInfo(char);
 
       const card = document.createElement('div');
@@ -689,24 +752,25 @@
       const charName = getCharName(charId);
       const iconUrl = getCharIcon(charId);
       const stars = '★'.repeat(rarity);
+      const safeCharName = esc(charName);
 
       card.innerHTML = `
         <div class="char-header" onclick="toggleCard(this)">
           <div class="char-avatar">
             ${iconUrl
-              ? `<img src="${iconUrl}" onerror="this.parentNode.textContent='🧍'" alt="${charName}" />`
+              ? `<img src="${esc(iconUrl)}" onerror="this.parentNode.textContent='🧍'" alt="${safeCharName}" />`
               : '<span>🧍</span>'
             }
           </div>
           <div class="char-meta">
-            <div class="char-name">${charName}</div>
+            <div class="char-name">${safeCharName}</div>
             <div class="char-sub">
               <span class="rarity-stars">${stars}</span>
               ${elementInfo
-                ? `<span class="char-element ${elementInfo.cls}" title="${elementInfo.name}">${elementInfo.emoji}</span>`
+                ? `<span class="char-element ${esc(elementInfo.cls)}" title="${esc(elementInfo.name)}">${elementInfo.emoji}</span>`
                 : ''
               }
-              <span class="char-level">Рівень ${level}</span>
+              <span class="char-level">Рівень ${esc(level)}</span>
               <span class="constellation-badge">C${constell}</span>
             </div>
           </div>
@@ -727,7 +791,6 @@
       const weapon = equip.find(e => e.flat?.itemType === 'ITEM_WEAPON');
       if (!weapon) return '';
 
-      const name = weapon.flat?.nameTextMapHash || 'Зброя';
       const level = weapon.weapon?.level || 1;
       const refine = weapon.weapon?.affixMap ? Object.values(weapon.weapon.affixMap)[0] + 1 : 1;
       const iconKey = weapon.flat?.icon;
@@ -740,13 +803,13 @@
           <div class="weapon-row">
             <div class="weapon-icon">
               ${iconUrl
-                ? `<img src="${iconUrl}" onerror="this.parentNode.textContent='⚔'" alt="weapon" />`
+                ? `<img src="${esc(iconUrl)}" onerror="this.parentNode.textContent='⚔'" alt="weapon" />`
                 : '⚔'
               }
             </div>
             <div>
-              <div class="weapon-name">${displayName}</div>
-              <div class="weapon-meta">Рівень ${level} · R${refine}</div>
+              <div class="weapon-name">${esc(displayName)}</div>
+              <div class="weapon-meta">Рівень ${esc(level)} · R${esc(refine)}</div>
             </div>
           </div>
         </div>
@@ -825,6 +888,15 @@
       card.classList.toggle('open');
     }
 
+    // Escape HTML to prevent XSS from API data
+    function esc(str) {
+      return String(str ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
     function getCharIcon(avatarId) {
       // Map known IDs to enka icon names
       const knownIcons = {
@@ -871,7 +943,6 @@
         10000053: 'UI_AvatarIcon_Sayu',
         10000054: 'UI_AvatarIcon_Eula',
         10000055: 'UI_AvatarIcon_Shougun',
-        10000056: 'UI_AvatarIcon_Thoma',
         10000058: 'UI_AvatarIcon_Aloy',
         10000059: 'UI_AvatarIcon_Shenhe',
         10000060: 'UI_AvatarIcon_Yunjin',
@@ -945,7 +1016,7 @@
         10000046: 'Тома', 10000047: 'Сіньян', 10000048: 'Розарія',
         10000049: 'Чунюнь', 10000050: 'Горо', 10000051: 'Сара',
         10000052: 'Ей (Ямата)', 10000053: 'Саю', 10000054: 'Ейла',
-        10000055: 'Сьоґун Рейдан', 10000056: 'Тома', 10000058: 'Елой',
+        10000055: 'Сьоґун Рейдан', 10000058: 'Елой',
         10000059: 'Шенхе', 10000060: 'Юньцзінь', 10000061: 'Кокомі',
         10000062: 'Ціці', 10000063: 'Хейдзо', 10000064: 'Єлань',
         10000065: 'Кукі Сінобу', 10000066: 'Ітто', 10000067: 'Яе Міко',
@@ -975,22 +1046,33 @@
     }
 
     function getElementInfo(char) {
-      // Map skillDepotId ranges to elements
-      const id = char.skillDepotId;
-      const elementRanges = [
-        [501, 'Wind'], [701, 'Rock'], [901, 'Electric'],
-        [1101, 'Grass'], [1301, 'Water'], [1401, 'Ice'], [1501, 'Fire'],
-        [201, 'Wind'], // Lumine/Aether default
-      ];
-      // Use propMap element if available
+      // First try fightPropMap prop '50' (element DMG bonus key indicates element)
       const eprop = char.fightPropMap?.['50'];
       const elementByProp = {
         1: 'Fire', 2: 'Water', 3: 'Grass', 4: 'Electric',
         5: 'Ice', 6: 'Wind', 7: 'Rock',
       };
-      const elemKey = eprop ? elementByProp[Math.round(eprop)] : null;
-      const info = ELEMENT_MAP[elemKey];
-      return info || null;
+      const elemKeyFromProp = eprop ? elementByProp[Math.round(eprop)] : null;
+      if (elemKeyFromProp) return ELEMENT_MAP[elemKeyFromProp] || null;
+
+      // Fallback: derive element from skillDepotId (reliable mapping)
+      const depotId = char.skillDepotId;
+      const depotToElement = {
+        201: 'Wind', 202: 'Wind',           // Aether / Lumine (Anemo)
+        204: 'Electric', 205: 'Electric',   // Traveler Electro
+        206: 'Grass', 207: 'Grass',         // Traveler Dendro
+        208: 'Water', 209: 'Water',         // Traveler Hydro
+        210: 'Fire', 211: 'Fire',           // Traveler Pyro
+        504: 'Wind', 506: 'Wind',
+        704: 'Rock', 706: 'Rock',
+        904: 'Electric', 906: 'Electric',
+        1104: 'Grass', 1106: 'Grass',
+        1304: 'Water', 1306: 'Water',
+        1404: 'Ice', 1406: 'Ice',
+        1504: 'Fire', 1506: 'Fire',
+      };
+      const elemKeyFromDepot = depotToElement[depotId];
+      return elemKeyFromDepot ? (ELEMENT_MAP[elemKeyFromDepot] || null) : null;
     }
 
     function guessRarity(avatarId) {
@@ -1036,6 +1118,16 @@
       document.getElementById('errorBox').classList.toggle('visible', state === 'error');
       document.getElementById('playerCard').classList.toggle('visible', state === 'player');
 
+      if (state === 'loading') {
+        // Reset loading message and hide previous results
+        const loadingMsg = document.getElementById('loadingMsg');
+        if (loadingMsg) loadingMsg.textContent = 'Отримуємо дані з Enka.Network';
+        document.getElementById('charsSection').style.display = 'none';
+        document.getElementById('charsList').classList.remove('visible');
+        document.getElementById('noChars').classList.remove('visible');
+        document.getElementById('wishNote').classList.remove('visible');
+      }
+
       if (state === 'error') {
         document.getElementById('errorMsg').textContent = msg || 'Невідома помилка';
         document.getElementById('charsSection').style.display = 'none';
@@ -1055,6 +1147,11 @@
     // ── KEYBOARD ──
     document.getElementById('uidInput').addEventListener('keydown', e => {
       if (e.key === 'Enter') fetchPlayer();
+    });
+    // Strip non-digit characters on input
+    document.getElementById('uidInput').addEventListener('input', e => {
+      const cleaned = e.target.value.replace(/\D/g, '').slice(0, 10);
+      if (e.target.value !== cleaned) e.target.value = cleaned;
     });
 
     // ── INIT ──
