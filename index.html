@@ -919,66 +919,82 @@
       EQUIP_SHOES: 2, EQUIP_RING: 3, EQUIP_DRESS: 4,
     };
 
-    // ── PROXY (CORS workaround for enka.network) ──
+    // ── PROXY CONFIG ──
     const ENKA_BASE = 'https://enka.network';
     const ICON_BASE = 'https://enka.network/ui/';
 
-    // IMPORTANT: When running from file:// or Telegram WebApp, origin is "null".
-    // Many CORS proxies block null origin. Only these are confirmed to work with null origin:
-    //
-    //  1. allorigins.win  — open to all origins, wraps in JSON (.contents field)
-    //  2. jsonp.afeld.me  — open, plain pass-through (deprecated but still up)
-    //  3. worker.enka  — Enka's own public CORS worker (most reliable, direct)
-    //
-    // We try direct enka first (works in Telegram WebApp which sends real origin),
-    // then fall back to proxies for file:// or blocked environments.
+    // ══════════════════════════════════════════════════════
+    // YOUR CLOUDFLARE WORKER URL — paste here after deploy:
+    // See worker.js file for setup instructions (2 minutes)
+    // ══════════════════════════════════════════════════════
+    const WORKER_URL = 'https://nameless-silence-765f.ivanpolishchuk45.workers.dev';  // e.g. 'https://enka-proxy.yourname.workers.dev'
 
-    const PROXIES = [
-      // 0 — Direct (works in Telegram WebApp, fails on file://)
-      {
+    // Build proxy list dynamically — worker goes first if configured
+    function buildProxyList() {
+      const list = [];
+
+      // Worker (most reliable — your own Cloudflare Worker, no CORS issues)
+      if (WORKER_URL) {
+        list.push({
+          name: 'Worker',
+          build: url => {
+            const path = url.replace(ENKA_BASE, '');
+            return WORKER_URL + path;
+          },
+          unwrap: t => t,
+        });
+      }
+
+      // Direct to Enka — works when Telegram WebApp sends a real origin
+      // (not file://)
+      list.push({
         name: 'Enka direct',
         build: url => url,
-        unwrap: text => text,
-        directOnly: true,   // skip if origin is null (file://)
-      },
-      // 1 — allorigins /get — wraps response in { contents, status }
-      {
-        name: 'AllOrigins /get',
+        unwrap: t => t,
+        skipOnNullOrigin: true,
+      });
+
+      // allorigins /get — wraps in {contents, status.http_code}
+      // Works from any origin including null. Most reliable free proxy.
+      list.push({
+        name: 'AllOrigins',
         build: url => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
         unwrap: text => {
           const j = JSON.parse(text);
-          // allorigins returns status.http_code separately
           if (j?.status?.http_code && j.status.http_code !== 200) {
-            throw Object.assign(new Error('upstream'), { httpCode: j.status.http_code });
+            const e = new Error('upstream_error');
+            e.httpCode = j.status.http_code;
+            throw e;
           }
           return j.contents;
         },
-      },
-      // 2 — allorigins /raw — plain pass-through, sometimes fails with null origin too
-      {
-        name: 'AllOrigins /raw',
-        build: url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-        unwrap: text => text,
-      },
-      // 3 — jsonp.afeld.me — deprecated CORS Anywhere instance, still works
-      {
-        name: 'afeld CORS',
+      });
+
+      // corsproxy.io — works from https:// origins (Telegram WebApp)
+      list.push({
+        name: 'corsproxy.io',
+        build: url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+        unwrap: t => t,
+        skipOnNullOrigin: true,
+      });
+
+      // cors-anywhere on Heroku — open, accepts all origins
+      list.push({
+        name: 'cors-anywhere',
         build: url => `https://cors-anywhere.herokuapp.com/${url}`,
-        unwrap: text => text,
-      },
-      // 4 — workers.dev open proxy (community)
-      {
-        name: 'yacdn',
-        build: url => `https://yacdn.org/proxy/${url}`,
-        unwrap: text => text,
-      },
-    ];
+        unwrap: t => t,
+      });
+
+      return list;
+    }
+
+    const PROXIES = buildProxyList();
 
     let characterData = {};
     let weaponData = {};
 
-    // Detect null origin (file:// or some Telegram builds)
-    const IS_NULL_ORIGIN = (location.protocol === 'file:' || location.origin === 'null');
+    // Detect null origin (file://) — some proxies block it
+    const IS_NULL_ORIGIN = location.protocol === 'file:' || location.origin === 'null';
 
     // ── ROBUST FETCH with retry across proxies ──
     async function fetchWithRetry(targetUrl, externalSignal) {
@@ -997,7 +1013,7 @@
         if (externalSignal?.aborted) break;
 
         // Skip direct fetch when running from file:// — will always be CORS-blocked
-        if (proxy.directOnly && IS_NULL_ORIGIN) continue;
+        if (proxy.skipOnNullOrigin && IS_NULL_ORIGIN) continue;
 
         const idx = proxyIndex++;
         const msgEl = document.getElementById('loadingMsg');
@@ -1105,9 +1121,10 @@
         return { ok: false, msg: 'cancelled' };
       }
 
+      const workerHint = WORKER_URL ? '' : '\n\nДля стабільної роботи налаштуй Cloudflare Worker (інструкція у файлі worker.js).';
       return {
         ok: false,
-        msg: `Не вдалося отримати дані. Перевір підключення до інтернету або спробуй пізніше.\n(${lastError?.message || 'невідома помилка'})`,
+        msg: `Не вдалося підключитись до Enka.Network. Перевір інтернет або спробуй пізніше.${workerHint}\n\n(${lastError?.message || 'невідома помилка'})`,
       };
     }
 
